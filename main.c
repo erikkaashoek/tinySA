@@ -3108,7 +3108,7 @@ int main(void)
 #ifdef __WATCHDOG__
   static const WDGConfig scan_wdgcfg = {
     STM32_IWDG_PR_256,
-    STM32_IWDG_RL(1 * (40000 / 256)), /* 1 second */
+    STM32_IWDG_RL(3 * 40000 / 256), /* 3 seconds */
     STM32_IWDG_WIN_DISABLED
   };
   wdgInit();
