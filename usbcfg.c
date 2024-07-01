@@ -175,74 +175,15 @@ static const uint8_t vcom_string2[] = {
 };
 #endif
 
-#ifdef TINYSA4
 /*
- * Serial Number string. VERSION = 'tinySA4_v1.3-nnn-gxxxxxxx'
- *                                  01234567890123456789012
- * skip last two 'xx' char due to  'tinySA4_v1.3-n-gxxxxxxx'
+ * Serial Number string.
  */
-static const uint8_t vcom_string3[] =
-{
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
+#define USB_SIZ_STRING_SERIAL (2 + 24)
+static uint8_t vcom_string3[USB_SIZ_STRING_SERIAL] = {
+ USB_DESC_BYTE(USB_SIZ_STRING_SERIAL), /* bLength.                         */
  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
-  USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[8], 0,  /* 'v' */
-  VERSION[9], 0,  /* '1' */
-  VERSION[10], 0, /* '.' */
-  VERSION[11], 0, /* '3' */
-  VERSION[12], 0, /* '-' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* 'n' */
-  VERSION[16], 0, /* '-' */
-  VERSION[17], 0, /* 'g' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-  VERSION[22], 0, /* 'x' */
-#endif
+ /* here goes the 12 char string encoded as UTF-16 (one ASCII, one 0x00)   */
 };
-#else
-/*
- * Serial Number string. VERSION = 'tinySA_v1.3-nnn-gxxxxxxx'
- *                                  0123456789012345678901
- * skip last two 'xx' char due to  'tinySA_v1.3-n-gxxxxxxx'
- */
-static const uint8_t vcom_string3[] = {
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
- USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
- USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[7], 0,  /* 'v' */
-  VERSION[8], 0,  /* '1' */
-  VERSION[9], 0,  /* '.' */
-  VERSION[10], 0, /* '3' */
-  VERSION[11], 0, /* '-' */
-  VERSION[12], 0, /* 'n' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* '-' */
-  VERSION[16], 0, /* 'g' */
-  VERSION[17], 0, /* 'x' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-#endif
-};
-#endif
 
 /*
  * Strings wrappers array.
@@ -253,6 +194,45 @@ static const USBDescriptor vcom_strings[] = {
   {sizeof vcom_string2, vcom_string2},
   {sizeof vcom_string3, vcom_string3}
 };
+
+/**
+  * @brief  Convert Hex 32Bits value into char
+  * @param  value: value to convert
+  * @param  pbuf: pointer to the buffer
+  * @param  len: buffer length
+  * @retval None
+  */
+static void int_to_unicode(uint32_t value, uint8_t *pbuf, uint8_t len) {
+  uint8_t idx = 0;
+  for (idx = 0 ; idx < len ; idx ++) {
+    if (((value >> 28)) < 0xA) {
+      pbuf[ 2 * idx] = (value >> 28) + '0';
+    } else {
+      pbuf[2 * idx] = (value >> 28) + 'A' - 10;
+    }
+    value = value << 4;
+    pbuf[ 2 * idx + 1] = 0;
+  }
+}
+
+/**
+  * @brief  Create the serial number string descriptor
+  * @param  None
+  * @retval None
+  * format and algorithm inspired by:
+  * https://github.com/limbongofficial/STM32_Core-Arduino/blob/master/cores/arduino/stm32/usb/usbd_desc.c#L326-L370
+  */
+static void prepare_sernum_str(void) {
+  uint32_t deviceserial0, deviceserial1, deviceserial2;
+  deviceserial0 = *(uint32_t *)0x1FFFF7AC;
+  deviceserial1 = *(uint32_t *)0x1FFFF7B0;
+  deviceserial2 = *(uint32_t *)0x1FFFF7B4;
+  deviceserial0 += deviceserial2;
+  if (deviceserial0 != 0) {
+    int_to_unicode(deviceserial0, &vcom_string3[2], 8);
+    int_to_unicode(deviceserial1, &vcom_string3[18], 4);
+  }
+}
 
 /*
  * Handles the GET_DESCRIPTOR callback. All required descriptors must be
@@ -271,8 +251,11 @@ static const USBDescriptor *get_descriptor(USBDriver *usbp,
   case USB_DESCRIPTOR_CONFIGURATION:
     return &vcom_configuration_descriptor;
   case USB_DESCRIPTOR_STRING:
-    if (dindex < 4)
+    if (dindex < 4) {
+      if ( dindex == 3 && vcom_string3[2] == 0 ) // not yet done
+        prepare_sernum_str();
       return &vcom_strings[dindex];
+    }
   }
   return NULL;
 }
