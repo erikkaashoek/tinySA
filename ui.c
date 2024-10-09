@@ -264,7 +264,7 @@ static int btn_wait_release(void)
 #ifdef SOFTWARE_TOUCH
 // ADC read count for measure X and Y (2^N count)
 #define TOUCH_X_N 3
-#define TOUCH_Y_N 3
+#define TOUCH_Y_N 4
 static int
 touch_measure_y(void)
 {
@@ -3197,7 +3197,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_trigger_level_acb)
           format = "LEVEL\n\b%.3F%s"; // 5 characters incl u, m, etc...
         else
           format = "LEVEL\n\b%.1f%s";
-        plot_printf(b->text, sizeof(b->text), format, setting.trigger_level,unit_string[setting.unit]);
+        plot_printf(b->text, sizeof(b->text), format, value(setting.trigger_level),unit_string[setting.unit]);
       } else {
         plot_printf(b->text, sizeof(b->text), "LEVEL\n\bTRACE %d", setting.trigger_trace+1);
       }
@@ -7347,6 +7347,23 @@ lever_search_marker(int status)
   } while (status != 0);
 }
 
+#if 0
+void lever_trigger(int status) {
+  static uint16_t lever_band = 0;
+  float *level = &setting.trigger_level;
+#ifdef __BANDS__
+  if (is_multiband_trigger()) level = &setting.bands[lever_band].level;
+#endif
+  do {
+    if (status & EVT_DOWN) *level+= 0.5f;
+    if (status & EVT_UP  ) *level-= 0.5f;
+    redraw_trigger(lever_band);
+    lcd_printf(180, 312, "%02x %.2f %.2f",  lever_band, setting.bands[lever_band].level, setting.trigger_level);
+    status = btn_wait_release();
+  } while (status != 0);
+}
+#endif
+
 // ex. 10942 -> 10000
 //      6791 ->  5000
 //       341 ->   200
@@ -7438,6 +7455,7 @@ ui_process_normal_lever(void)
         else
           lever_move(status, FREQ_IS_STARTSTOP() ? ST_STOP : ST_SPAN);
         break;
+//    case LM_TRIGGER: lever_trigger(status); break;
       }
     }
   }
@@ -7766,6 +7784,24 @@ touch_pickup_marker(int touch_x, int touch_y)
   return TRUE;
 }
 
+static int touch_pickup_trigger(int touch_x, int touch_y) {
+  touch_x -= OFFSETX;
+  touch_y -= OFFSETY;
+
+  int band = search_nearest_trigger(touch_x, touch_y);
+  if (band < 0) return FALSE;
+  float *level = &setting.trigger_level;
+#ifdef __BANDS__
+  if (is_multiband_trigger()) level = &setting.bands[band].level;
+#endif
+  do { // wait touch release
+    touch_position(&touch_x, &touch_y);
+    *level = pos_to_trigger_value(touch_y - OFFSETY);
+    redraw_trigger(band);
+  } while (touch_check()!= EVT_TOUCH_RELEASED);
+  return TRUE;
+}
+
 static int touch_quick_menu(int touch_x, int touch_y)
 {
   if (touch_x <OFFSETX)
@@ -8089,6 +8125,9 @@ void ui_process_touch(void)
         break;
       // Try drag marker
       if (touch_pickup_marker(touch_x, touch_y))
+        break;
+      // Try drag trigger line
+      if (touch_pickup_trigger(touch_x, touch_y))
         break;
       if (touch_marker_select(touch_x, touch_y))
         break;

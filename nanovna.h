@@ -624,6 +624,8 @@ extern uint16_t graph_bottom;
 
 // Marker start drag distance (can be bigger for various display resolution)
 #define MARKER_PICKUP_DISTANCE 20
+// Trigger line start drag distance (can be bigger for various display resolution)
+#define DRAG_TRIGGER_DISTANCE  10
 
 // Smith/polar chart
 //#define P_CENTER_X (CELLOFFSETX + WIDTH/2)
@@ -968,6 +970,7 @@ void redraw_frame(void);
 void request_to_draw_cells_behind_menu(void);
 void request_to_draw_cells_behind_numeric_input(void);
 void redraw_marker(int marker);
+void redraw_trigger(int band);
 void markmap_all_markers(void);
 void plot_into_index(measurement_t measured);
 void draw_frequencies(void);
@@ -979,6 +982,10 @@ void draw_cal_status(void);
 
 int distance_to_index(int8_t t, uint16_t idx, int16_t x, int16_t y);
 int search_nearest_index(int x, int y, int t);
+int search_nearest_trigger(int x, int y);
+
+float pos_to_trigger_value(int y);
+bool is_multiband_trigger(void);
 
 int marker_search_max(int m);
 int marker_search_left_max(int m);
@@ -1604,7 +1611,7 @@ extern volatile uint8_t abort_enabled;
 
 // lever_mode
 enum lever_mode {
-  LM_MARKER, LM_SEARCH, LM_CENTER, LM_SPAN, LM_EDELAY
+  LM_MARKER, LM_SEARCH, LM_CENTER, LM_SPAN, LM_TRIGGER
 };
 
 // marker smith value format

@@ -2046,7 +2046,7 @@ void set_trigger_level(float trigger_level)
 #ifdef  __TRIGGER_TRACE__
   setting.trigger_trace = 255;
 #endif
-  redraw_request |= REDRAW_TRIGGER | REDRAW_CAL_STATUS | REDRAW_AREA;
+  redraw_request |= REDRAW_TRIGGER | REDRAW_CAL_STATUS;
   //dirty = true;             // No HW update required, only status panel refresh
 }
 
@@ -2058,7 +2058,6 @@ void set_trigger(int trigger)
     setting.trigger_direction = trigger;
   } else if (trigger == T_DONE) {
     pause_sweep();                    // Trigger once so pause after this sweep has completed!!!!!!!
-    redraw_request |= REDRAW_CAL_STATUS;        // Show status change    setting.trigger = trigger;
     setting.trigger = trigger;
   } else {
     sweep_mode = SWEEP_ENABLE;
