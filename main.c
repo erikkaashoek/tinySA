@@ -264,8 +264,6 @@ static THD_FUNCTION(Thread1, arg)
       do {
         shell_function(shell_nargs - 1, &shell_args[1]);
         shell_function = 0;
-        if (operation_requested == OP_NONE) // Don't prompt if aborted
-          shell_printf(VNA_SHELL_PROMPT_STR);
         // Resume shell thread
         if (!abort_enabled) osalThreadDequeueNextI(&shell_thread, MSG_OK);
       } while (shell_function);
@@ -2789,7 +2787,6 @@ static void VNAShell_executeLine(char *line)
     } else {
       operation_requested = false; // otherwise commands  will be aborted
       scp->sc_function(shell_nargs - 1, &shell_args[1]);
-      shell_printf(VNA_SHELL_PROMPT_STR);
       if (dirty) {
         operation_requested = true;   // ensure output is updated
         if (MODE_OUTPUT(setting.mode))
@@ -2801,7 +2798,6 @@ static void VNAShell_executeLine(char *line)
     return;
   }
   shell_printf("%s?" VNA_SHELL_NEWLINE_STR, shell_args[0]);
-  shell_printf(VNA_SHELL_PROMPT_STR);
 }
 
 void shell_executeCMDLine(char *line) {
