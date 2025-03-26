@@ -4180,6 +4180,10 @@ again:                                                              // Spur redu
           if (S_STATE(setting.spur_removal)){         // If in low input mode and spur reduction is on
             if (setting.below_IF == S_AUTO_OFF &&       // Auto and not yet in below IF
 #ifdef TINYSA4
+#define HARMONIC_NO_BELOW_SPAN   30000000
+                ! ( max2871 && ((lf > 2 * local_IF - HARMONIC_NO_BELOW_SPAN && lf < 2 * local_IF + HARMONIC_NO_BELOW_SPAN) ||
+                               (lf > 3 * local_IF - HARMONIC_NO_BELOW_SPAN && lf < 3 * local_IF + HARMONIC_NO_BELOW_SPAN) ||
+                               (lf > 4 * local_IF - HARMONIC_NO_BELOW_SPAN && lf < 4 * local_IF + HARMONIC_NO_BELOW_SPAN))) &&
                 ( lf > ULTRA_MAX_FREQ ||    // Harmonic mode
                     lf < 400000000 ||       // below 400MHz use below IF
                     ( lf < MAX_ABOVE_IF_FREQ && lf > MIN_BELOW_IF_FREQ) ) // From 2.1GHz to 3.35GHz use below IF
