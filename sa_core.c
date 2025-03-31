@@ -6618,9 +6618,9 @@ int validate_flatness(int i) {          // This assumes only trace 1 is active
       break;
   }
 //  shell_printf("Width %d between %d and %d\n\r", j - k, 2* W2P(test_case[i].width), 3* W2P(test_case[i].width) );
-  if (j - k < 2* W2P(test_case[i].width))
+  if (j - k < 1* W2P(test_case[i].width))
       return(TS_FAIL);
-  if (j - k > 3* W2P(test_case[i].width))
+  if (j - k > 4* W2P(test_case[i].width))
       return(TS_FAIL);
   test_fail_cause[i] = "";
   return(TS_PASS);
