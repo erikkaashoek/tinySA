@@ -423,7 +423,7 @@ to_dBm(const float v)
     return   logf(v/(sqrtf(50.0)))*(20.0/logf(10.0)) + 30.0;
   case U_VPP:
 //  return log10f(v/(sqrtf(50.0)))* 20.0             + 30.0;
-    return   logf((v/2.828)/(sqrtf(50.0)))*(20.0/logf(10.0)) + 30.0;
+    return   logf(v/(2.828*sqrtf(50.0)))*(20.0/logf(10.0)) + 30.0;
   case U_WATT:
 //  return log10f(v*1000.0)* 10.0;
     return   logf(v*1000.0)*(10.0/logf(10.0));
@@ -503,11 +503,17 @@ trace_into_index_y_array(index_y_t *y, float *array, int points)
     if (mult) value = fast_expf(value*mult);
     value = ref - value * scale;
     int v = value;
-         if (v <   0) v = 0;
-    else if (v > max) v = max;
+         if (v <    0) v = 0;
+    else if (v >= max) v = max-1;
     y[i] = v;
   }
   return;
+}
+
+static index_y_t trace_into_index_y(float level) {
+  index_y_t tp;
+  trace_into_index_y_array(&tp, &level, 1);
+  return tp;
 }
 
 static inline void
@@ -583,43 +589,50 @@ markmap_upperarea(void)
 #endif
 }
 
-static uint16_t get_trigger_level(
 #ifdef __BANDS__
-    int x
-#else
-    void
-#endif
-    ){
-  index_y_t trigger;
-#ifdef TINYSA4
-  if (setting.trigger_trace != 255)
-    setting.trigger_level = measured[setting.trigger_trace][x];
-#endif
-#ifdef __BANDS__
-  else if (!setting.draw_line && setting.multi_band && !setting.multi_trace) {
-    int b = getBand(x);
-    setting.trigger_level = setting.bands[b].level;
-  }
-#endif
-  trace_into_index_y_array(&trigger, &setting.trigger_level, 1);
-  return trigger;
+// Triggers draw in multiband mode
+bool is_multiband_trigger(void) {
+  if (setting.multi_band && !setting.multi_trace
+        #ifdef __DRAW_LINE__
+          && !setting.draw_line
+        #endif
+     ) return true;
+  return false;
 }
 
-static inline void
-markmap_trigger_area(void){
-#ifdef __BANDS__
-  uint16_t tp = get_trigger_level(0);
-#else
-  uint16_t tp = get_trigger_level();
+// Mark band trigger area for redraw
+static void markmap_band_trigger(int band) {
+  band_t *b = &setting.bands[band];
+  if (!b->enabled) return;
+  int tp = trace_into_index_y(b->level);
+  int x1 = trace_index_x[b->start_index == 0 ? b->start_index : b->start_index - 1];
+  int x2 = trace_index_x[b->stop_index];
+  invalidate_rect(x1, tp, x2, tp);
+}
 #endif
+
+// Mark trigger area or line for redraw
+static void markmap_trigger(void) {
+  int tp = trace_into_index_y(setting.trigger_level);
   markmap[current_mappage][tp/CELLWIDTH] = (map_t)0xFFFFFFFF;
+}
+
+// Mark all trigger lines area for redraw
+static void markmap_trigger_area(void) {
+#ifdef __BANDS__
+  if (is_multiband_trigger()) {
+    for (int band = 0; band < BANDS_MAX; band++)
+      markmap_band_trigger(band);
+  } else
+#endif
+    markmap_trigger();
 }
 
 //
 // in most cases _compute_outcode clip calculation not give render line speedup
 //
 static inline void
-cell_drawline(int x0, int y0, int x1, int y1, int c)
+cell_drawline(int x0, int y0, int x1, int y1, pixel_t c)
 {
   if (x0 < 0 && x1 < 0) return;
   if (y0 < 0 && y1 < 0) return;
@@ -652,6 +665,24 @@ cell_drawline(int x0, int y0, int x1, int y1, int c)
     if (e2 > dx) { err-= dy; x0+=sx;}
     if (e2 < dy) { err-= dx; y0+=CELLWIDTH; if (y0>=CELLHEIGHT*CELLWIDTH) return;} // stop after cell bottom
   }
+}
+
+static void
+cell_draw_hline(int x0, int x1, int y, pixel_t c) {
+  if ((uint32_t)y >= CELLHEIGHT) return;
+//  if (x1 < x0) SWAP(x0, x1);
+  if (x0 <         0) x0 = 0;
+  if (x1 > CELLWIDTH) x1 = CELLWIDTH;
+  for (;x0 < x1; x0++) cell_buffer[y * CELLWIDTH + x0] = c;
+}
+
+static void
+cell_draw_vline(int y0, int y1, int x, pixel_t c) {
+  if ((uint32_t)x >= CELLWIDTH) return;
+//  if (y1 < y0) SWAP(y0, y1);
+  if (y0 <          0) y0 = 0;
+  if (y1 > CELLHEIGHT) y1 = CELLHEIGHT;
+  for (;y0 < y1; y0++) cell_buffer[y0 * CELLWIDTH + x] = c;
 }
 
 // Give a little speedup then draw rectangular plot (50 systick on all calls, all render req 700 systick)
@@ -1150,50 +1181,42 @@ draw_cell(int m, int n)
 #ifdef __CHANNEL_POWER__
   if (setting.measurement == M_CP||setting.measurement == M_SNR) {
     c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
-    for (x = 0; x < w; x++)
-      if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
-        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
-    }
-  }
-#endif
-#ifdef __BANDS__
-  if (setting.multi_band && !setting.multi_trace) {
-    c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
-    for (x = 0; x < w; x++) {
-      int idx1 = ((x+x0) * sweep_points) / WIDTH;
-      int idx2 = ((x+x0+1) * sweep_points) / WIDTH;
-      if (getBand(idx1) != getBand(idx2) && idx2 < WIDTH-2) {
-        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
-      }
-    }
+    cell_draw_vline(0, h, 1*WIDTH/3 - x0, c);
+    cell_draw_vline(0, h, 2*WIDTH/3 - x0, c);
   }
 #endif
 //  PULSE;
 #endif
-// Draw trigger line
-  if ((setting.trigger != T_AUTO
+
+  // Draw trigger and band splitter lines
+  bool draw_trigger = (setting.trigger != T_AUTO
 #ifdef __TRIGGER_TRACE__
        && setting.trigger_trace == 255
 #endif
-      )
+      );
+  c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
+#ifdef __BANDS__
+  if (setting.multi_band && !setting.multi_trace) {
+    for (int band = 0; band < BANDS_MAX; band++) {
+      band_t *b = &setting.bands[band];
+      if (!b->enabled) continue;
+      // Get start and stop band display position
+      int x1 = trace_index_x[b->start_index == 0 ? 0 : b->start_index - 1] - x0;
+      int x2 = trace_index_x[b->stop_index ] - x0;
+      cell_draw_vline(0, h, x2, c); // Draw vertical band splitter
+      if (draw_trigger)             // Draw trigger line
+        cell_draw_hline(x1, x2, trace_into_index_y(b->level) - y0, c);
+    }
+    draw_trigger = false; // triggers draw in multi-band mode
+  }
+#endif
+  // Draw line or single trigger line
+  if (draw_trigger
 #ifdef __DRAW_LINE__
       || setting.draw_line
 #endif
-      ) {
-    c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
-#ifndef __BANDS__
-    int tp = get_trigger_level() - y0;
-    if (tp>=0 && tp < h)
-#endif
-      for (x = 0; x < w; x++) {
-#ifdef __BANDS__
-        int tp = get_trigger_level(x + x0 - CELLOFFSETX) - y0;
-        if (tp>=0 && tp < h)
-#endif
-          if ((uint32_t)(x + x0 - CELLOFFSETX) <= WIDTH + CELLOFFSETX)
-            cell_buffer[tp * CELLWIDTH + x] = c;
-      }
-  }
+     ) cell_draw_hline(0, w, trace_into_index_y(setting.trigger_level) - y0, c);
+
 #if 1
   // Only right cells
   if (m >= (GRID_X_TEXT)/CELLWIDTH)
@@ -1369,6 +1392,57 @@ draw_all(bool flush)
   redraw_request = 0;
 }
 
+//
+// Call this function then need fast draw trigger line
+// Used in ui.c for leveler move trigger (not added yet), drag trigger and etc.
+void redraw_trigger(int band) {
+  (void)band;
+#ifdef __BANDS__
+  if (is_multiband_trigger())
+    markmap_band_trigger(band);
+  else
+#endif
+    markmap_trigger();
+  draw_all_cells(TRUE);
+  redraw_request|= REDRAW_CAL_STATUS | REDRAW_AREA;  // Force redraw cal after
+}
+
+// Convert y display position to value in dBm
+float pos_to_trigger_value(int y) {
+  if (y <           0) y = 0;
+  if (y > area_height) y = area_height;
+  return to_dBm(get_trace_refpos() - get_trace_scale() * (float)(y * NGRIDY) / area_height);
+}
+
+// Search nearest trigger line on screen
+int search_nearest_trigger(int x, int y) {
+  if ((setting.trigger == T_AUTO       // Not in auto mode
+      #ifdef __TRIGGER_TRACE__
+       || setting.trigger_trace != 255 // Not in Trigger trace mode
+      #endif
+      )
+      #ifdef __DRAW_LINE__
+       && !setting.draw_line           // Allow in draw line mode
+      #endif
+  ) return -1;
+#ifdef __BANDS__
+  if (is_multiband_trigger()) {
+    for (int band = 0; band < BANDS_MAX; band++) {
+      band_t *b = &setting.bands[band];
+      if (!b->enabled) continue;
+      int x1 = trace_index_x[b->start_index];
+      int x2 = trace_index_x[b->stop_index ];
+      if (x < x1 || x > x2) continue;
+      int tl = trace_into_index_y(b->level) + DRAG_TRIGGER_DISTANCE - y;
+      if ((uint32_t)tl < 2 * DRAG_TRIGGER_DISTANCE) return band;
+    }
+    return -1;
+  }
+#endif
+  int tl = trace_into_index_y(setting.trigger_level) + DRAG_TRIGGER_DISTANCE - y;
+  if ((uint32_t)tl < 2 * DRAG_TRIGGER_DISTANCE) return 0;
+  return -1;
+}
 
 //
 // Call this function then need fast draw marker and marker info
