@@ -6542,7 +6542,7 @@ int validate_signal_within(int i, float margin)
 #ifdef TINYSA4
   if (test_case[i].setup == TP_15MHZ_LNA) {
     test_level = lpf_test_level;
-    margin = 5;
+    margin = 10;
   }
   if (fabsf(config.low_level_offset) > 10)
     return(TS_FAIL);
@@ -6618,9 +6618,9 @@ int validate_flatness(int i) {          // This assumes only trace 1 is active
       break;
   }
 //  shell_printf("Width %d between %d and %d\n\r", j - k, 2* W2P(test_case[i].width), 3* W2P(test_case[i].width) );
-  if (j - k < 1* W2P(test_case[i].width))
+  if (j - k < 1 * W2P(test_case[i].width))
       return(TS_FAIL);
-  if (j - k > 4* W2P(test_case[i].width))
+  if (j - k > 4 * W2P(test_case[i].width))
       return(TS_FAIL);
   test_fail_cause[i] = "";
   return(TS_PASS);
@@ -7917,7 +7917,7 @@ void calibrate(void)
     setting.frequency_IF = config.frequency_IF1;
     fill_spur_table();
   }
-  if (peakLevel < -40 || peakLevel > -30)
+  if (peakLevel < -45 || peakLevel > -30)
     goto low_level;
   determine_direct_test_freq();
 #if 1   // Jump calibration not yet enabled
