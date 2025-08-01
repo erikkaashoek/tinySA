@@ -8134,10 +8134,10 @@ void calibrate(void)
         local_test_status = test_validate(test_case);                       // Validate test also sets attenuation if zero span
 #endif
 #endif
-        if ((calibration_stage == CS_NORMAL && peakLevel < -40)
+        if ((calibration_stage == CS_NORMAL && peakLevel < -60)
 #ifdef TINYSA4
-            || (calibration_stage == CS_LNA && peakLevel < -40)
-            || (calibration_stage == CS_ULTRA && peakLevel < -40)
+            || (calibration_stage == CS_LNA && peakLevel < -60)
+            || (calibration_stage == CS_ULTRA && peakLevel < -60)
             || (calibration_stage == CS_DIRECT_LNA && peakLevel < direct_level - 50)
 #endif
         ) {
