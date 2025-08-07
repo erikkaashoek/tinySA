@@ -2266,13 +2266,18 @@ VNA_SHELL_FUNCTION(cmd_info)
   (void)argc;
   (void)argv;
   int i = 0;
+#ifdef TINYSA3
+  while (info_about[i]) {
+    shell_printf("%s\r\n", info_about[i]);
+    i++;
+  }
+  if (has_esd)
+    shell_printf("ESD protected\r\n");
+#else
   while (info_about[i]) {
     shell_printf("%s%s\r\n", info_about[i], (i == 0 ? hw_text : ""));
     i++;
   }
-#ifdef TINYSA3
-  if (has_esd)
-    shell_printf("ESD protected\r\n");
 #endif
 }
 #endif

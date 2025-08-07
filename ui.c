@@ -6396,7 +6396,7 @@ redraw_cal_status:
   // Compact status string
 //  ili9341_set_background(LCD_FG_COLOR);
   ili9341_set_foreground(LCD_FG_COLOR);
-  strncpy(buf,"      ",BLEN-1);
+  strncpy(buf,"      ",BLEN);
   if (setting.auto_IF)
     buf[0] = 'f';
   else

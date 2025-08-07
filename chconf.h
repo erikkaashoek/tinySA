@@ -158,6 +158,8 @@
  */
 #ifdef TINYSA4
 #define CH_CFG_USE_WAITEXIT                 TRUE
+#else
+#define CH_CFG_USE_WAITEXIT                 FALSE
 #endif
 
 /**
