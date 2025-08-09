@@ -1595,7 +1595,7 @@ static const menuitem_t  menu_settings3[];
 static const menuitem_t  menu_measure_noise_figure[];
 static const menuitem_t  menu_calibrate_harmonic[];
 static const menuitem_t  menu_calibrate_normal[];
-static const menuitem_t  menu_calibrate_max[];
+// static const menuitem_t  menu_calibrate_max[];
 #endif
 static const menuitem_t  menu_calibrate[];
 static const menuitem_t  menu_sweep[];
@@ -5593,7 +5593,7 @@ static void fetch_numeric_target(uint8_t mode)
     plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
     break;
   case KM_BAND_SPAN:
-    uistat.freq_value = abs(setting.bands[active_band].end-setting.bands[active_band].start);
+    uistat.freq_value = setting.bands[active_band].end-setting.bands[active_band].start;
     plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
     break;
   case KM_BAND_LEVEL:
@@ -5878,7 +5878,7 @@ set_numeric_value(void)
     break;
   case KM_BAND_CENTER:
   {
-    freq_t span = abs(setting.bands[active_band].end - setting.bands[active_band].start);
+    freq_t span = setting.bands[active_band].end - setting.bands[active_band].start;
     freq_t center = uistat.freq_value - (setting.frequency_offset - FREQUENCY_SHIFT);
     setting.bands[active_band].start = center - span/2;
     setting.bands[active_band].end = center + span/2;
@@ -6396,7 +6396,7 @@ redraw_cal_status:
   // Compact status string
 //  ili9341_set_background(LCD_FG_COLOR);
   ili9341_set_foreground(LCD_FG_COLOR);
-  strncpy(buf,"      ",BLEN-1);
+  strncpy(buf,"      ",BLEN);
   if (setting.auto_IF)
     buf[0] = 'f';
   else
