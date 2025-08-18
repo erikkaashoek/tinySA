@@ -1065,10 +1065,6 @@ void toggle_high_out_adf4350(void)
 void toggle_extra_lna(void)
 {
   setting.extra_lna = !setting.extra_lna;
-#ifdef TINYSA4_4
-  if (setting.extra_lna)
-    setting.attenuate_x2 = 0;
-#endif
   set_extra_lna(setting.extra_lna);
 }
 
@@ -1083,6 +1079,10 @@ void set_extra_lna(int t)
     setting.correction_frequency = config.correction_frequency[CORRECTION_LOW_IN];
     setting.correction_value = config.correction_value[CORRECTION_LOW_IN];
   }
+#endif
+#ifdef TINYSA4_4
+  if (setting.extra_lna)
+    setting.attenuate_x2 = 0;
 #endif
   dirty = true;
 }
