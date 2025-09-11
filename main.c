@@ -304,6 +304,18 @@ static THD_FUNCTION(Thread1, arg)
         }
       }
     }
+
+#ifdef __USE_RTC__
+    static uint32_t minutes;
+    const uint32_t tr = rtc_get_tr_bin();
+    const uint32_t now = RTC_TR_MIN(tr);
+
+    if (minutes != now) {
+      minutes = now;
+      redraw_request |= REDRAW_CAL_STATUS;
+    }
+#endif // __USE_RTC__
+
     // plot trace and other indications as raster
     draw_all(completed);  // flush markmap only if scan completed to prevent
                           // remaining traces
