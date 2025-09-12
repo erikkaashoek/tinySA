@@ -6228,14 +6228,20 @@ redraw_cal_status:
   if (setting.multi_band){
     ili9341_set_foreground(LCD_BRIGHT_COLOR_GREEN);
     lcd_printf(x, y, "MULTI");
-    y += 2*YSTEP + YSTEP/2;
+    y = add_quick_menu(y+= YSTEP, (menuitem_t *)menu_band_select);
   }
 #endif
 #ifdef TINYSA4
-  if (setting.measurement != M_OFF){
+  const uint8_t measurement = setting.measurement;
+  if (measurement != M_OFF) {
     ili9341_set_foreground(LCD_BRIGHT_COLOR_GREEN);
-    lcd_printf(x, y, measurement_text[setting.measurement]);
-    y += 2*YSTEP + YSTEP/2;
+    lcd_printf(x, y, measurement_text[measurement]);
+    const menuitem_t *measurement_menuitem = measurement < M_LINEARITY
+      ? menu_measure 
+      : (measurement < M_NF_TINYSA 
+        ? menu_measure2 
+        : menu_measure_noise_figure);
+    y = add_quick_menu(y += YSTEP, (menuitem_t *)measurement_menuitem);
   }
 
 #endif
