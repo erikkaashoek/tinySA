@@ -5629,7 +5629,11 @@ static volatile int dummy;
     }
 //    scandirty = true;                // To show trigger happened
   }
-  if (setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
+  if (
+#ifdef TINYSA4
+      progress_bar &&
+#endif
+      show_bar && setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
     // ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1, 0);     // Erase progress bar before updating actual_sweep_time
     ili9341_set_background(LCD_BG_COLOR);
     ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
