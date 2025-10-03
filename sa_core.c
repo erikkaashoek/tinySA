@@ -5975,7 +5975,7 @@ static volatile int dummy;
   } else if (setting.measurement == M_PHASE_NOISE  && markers[0].index > 10) {    //  ------------Phase noise measurement
     // Position phase noise marker at requested offset
     set_marker_index(1, markers[0].index + (setting.mode == M_LOW ? WIDTH/4 : -WIDTH/4));
-  } else if ((setting.measurement == M_PASS_BAND || setting.measurement == M_FM)  && markers[0].index > 10) {      // ----------------Pass band measurement
+  } else if ((setting.measurement == M_PASS_BAND || setting.measurement == M_WIDTH || setting.measurement == M_FM)  && markers[0].index > 10) {      // ----------------Pass band measurement
     int t1;
     int t2;
     float v = -200;
@@ -5987,7 +5987,10 @@ static volatile int dummy;
     }
     t1 = 0;
     t2 = 0;
-    v = v - (in_selftest ? 6.0 : 3.0);
+    if (setting.measurement == M_WIDTH)
+      v = v + uistat.value;
+    else
+      v = v - (in_selftest ? 6.0 : 3.0);
     while (t1 < markers[0].index && actual_t[t1+1] < v)                                        // Find left -3dB point
       t1++;
     if (t1< markers[0].index)

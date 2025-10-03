@@ -3005,6 +3005,16 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
 //      SetAverage(4);
 
       break;
+    case M_WIDTH:                             // occupied width measurement
+//      reset_settings(setting.mode);
+      markers[1].enabled = M_ENABLED;
+      markers[2].enabled = M_ENABLED;
+      kp_help_text = "dBc";
+      ui_mode_keypad(KM_LEVEL);
+      set_measurement(M_WIDTH);
+//      SetAverage(4);
+
+      break;
 #ifdef __LINEARITY__
     case M_LINEARITY:
       TRACE_ENABLE(TRACE_STORED_FLAG);
@@ -5019,7 +5029,8 @@ static const menuitem_t menu_measure[] = {
   { MT_ADV_CALLBACK,            M_OIP3,       "OIP3",           menu_measure_acb},
   { MT_ADV_CALLBACK,            M_PHASE_NOISE,"PHASE\nNOISE",   menu_measure_acb},
   { MT_ADV_CALLBACK,            M_SNR,        "SNR",            menu_measure_acb},
-  { MT_ADV_CALLBACK,            M_PASS_BAND,  "-3dB\nWIDTH",     menu_measure_acb},
+  { MT_ADV_CALLBACK,            M_PASS_BAND,  "-3dB\nWIDTH",    menu_measure_acb},
+  { MT_ADV_CALLBACK,            M_WIDTH,   "OCCUPIED\nWIDTH",menu_measure_acb},
   { MT_SUBMENU,  0,             S_RARROW" MORE",                menu_measure2},
   { MT_NONE,   0, NULL, menu_back} // next-> menu_back
 };

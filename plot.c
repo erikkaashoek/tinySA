@@ -1701,7 +1701,7 @@ static void cell_draw_marker_info(int x0, int y0)
     active = 2;
   for (int i = 0; i < MARKER_COUNT; i++) {
     if (i == 3) {
-      if (setting.measurement == M_PASS_BAND) {
+      if (setting.measurement == M_PASS_BAND||setting.measurement == M_WIDTH) {
         freq_t f;
         if (markers[2].frequency>markers[1].frequency)
           f = markers[2].frequency-markers[1].frequency;
