@@ -5095,7 +5095,8 @@ static bool sweep(bool break_on_operation)
 #endif
   }
 
-  bool show_bar = ( MODE_INPUT(setting.mode) ||  setting.frequency_step != 0 || setting.level_sweep != 0.0 ? true : false);
+  bool show_bar = ( MODE_INPUT(setting.mode) ||  setting.frequency_step != 0 || setting.level_sweep != 0.0 )
+    && !isFullScreenMode() && !current_menu_is_form();
 
 #if 0
 #ifdef TINYSA4
@@ -5205,7 +5206,7 @@ static bool sweep(bool break_on_operation)
 #ifdef TINYSA4
           progress_bar &&
 #endif
-          setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
+          show_bar && setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
         ili9341_set_background(LCD_BG_COLOR);
         ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);                    // Erase progress bar
 #ifdef __SWEEP_RESTART__
@@ -5628,7 +5629,11 @@ static volatile int dummy;
     }
 //    scandirty = true;                // To show trigger happened
   }
-  if (setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
+  if (
+#ifdef TINYSA4
+      progress_bar &&
+#endif
+      show_bar && setting.actual_sweep_time_us > ONE_SECOND_TIME /* && MODE_INPUT(setting.mode) */) {
     // ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1, 0);     // Erase progress bar before updating actual_sweep_time
     ili9341_set_background(LCD_BG_COLOR);
     ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);

@@ -1619,8 +1619,10 @@ void update_bands(void)
         _f_band_index[idx] = b;
         setting.bands[b].stop_index = idx;
         idx++;
-        if (idx >= sweep_points)
-          return;
+        if (idx >= sweep_points) {
+          b = BANDS_MAX;  // exit both loops
+          break;
+        }
       }
       else {
         b++;
