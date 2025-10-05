@@ -6137,6 +6137,22 @@ int add_quick_menu(int y, menuitem_t *menu)
 
 const char *month[] = { "Jan", "Feb", "Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
 
+#ifdef TINYSA4
+static bool is_current_measurement(const menuitem_t *menuitem)
+{
+  const uint8_t measurement = setting.measurement;
+
+  while (menuitem->type != MT_NONE) {
+    if (menuitem->data == measurement)
+      return true;
+
+    ++menuitem;
+  }
+
+  return false;
+}
+#endif // TINYSA4
+
 void draw_cal_status(void)
 {
 #define BLEN    7
@@ -6247,12 +6263,18 @@ redraw_cal_status:
   if (measurement != M_OFF) {
     ili9341_set_foreground(LCD_BRIGHT_COLOR_GREEN);
     lcd_printf(x, y, measurement_text[measurement]);
-    const menuitem_t *measurement_menuitem = measurement < M_LINEARITY
-      ? menu_measure 
-      : (measurement < M_NF_TINYSA 
-        ? menu_measure2 
-        : menu_measure_noise_figure);
-    y = add_quick_menu(y += YSTEP, (menuitem_t *)measurement_menuitem);
+
+    static const menuitem_t *menus[] = { menu_measure, menu_measure2, menu_measure_noise_figure };
+    static const size_t menus_count = sizeof menus / sizeof menus[0];
+
+    for (size_t i = 0; i < menus_count; ++i) {
+      const menuitem_t *menu = menus[i];
+
+      if (is_current_measurement(menu)) {
+        y = add_quick_menu(y += YSTEP, (menuitem_t *)menu);
+        break;
+      }
+    }
   }
 
 #endif
