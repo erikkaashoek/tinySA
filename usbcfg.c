@@ -15,10 +15,17 @@
 */
 
 #include "hal.h"
+#include "nanovna.h"
 
 /* Virtual serial port over USB.*/
 SerialUSBDriver SDU1;
 
+enum {
+  STR_LANG_ID = 0,
+  STR_MANUFACTURER,
+  STR_PRODUCT,
+  STR_SERIAL
+};
 /*
  * Endpoints to be used for USBD1.
  */
@@ -175,84 +182,40 @@ static const uint8_t vcom_string2[] = {
 };
 #endif
 
-#ifdef TINYSA4
-/*
- * Serial Number string. VERSION = 'tinySA4_v1.3-nnn-gxxxxxxx'
- *                                  01234567890123456789012
- * skip last two 'xx' char due to  'tinySA4_v1.3-n-gxxxxxxx'
- */
-static const uint8_t vcom_string3[] =
-{
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
- USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
-  USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[8], 0,  /* 'v' */
-  VERSION[9], 0,  /* '1' */
-  VERSION[10], 0, /* '.' */
-  VERSION[11], 0, /* '3' */
-  VERSION[12], 0, /* '-' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* 'n' */
-  VERSION[16], 0, /* '-' */
-  VERSION[17], 0, /* 'g' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-  VERSION[22], 0, /* 'x' */
-#endif
-};
-#else
-/*
- * Serial Number string. VERSION = 'tinySA_v1.3-nnn-gxxxxxxx'
- *                                  0123456789012345678901
- * skip last two 'xx' char due to  'tinySA_v1.3-n-gxxxxxxx'
- */
-static const uint8_t vcom_string3[] = {
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
- USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
- USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[7], 0,  /* 'v' */
-  VERSION[8], 0,  /* '1' */
-  VERSION[9], 0,  /* '.' */
-  VERSION[10], 0, /* '3' */
-  VERSION[11], 0, /* '-' */
-  VERSION[12], 0, /* 'n' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* '-' */
-  VERSION[16], 0, /* 'g' */
-  VERSION[17], 0, /* 'x' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-#endif
-};
-#endif
-
 /*
  * Strings wrappers array.
  */
 static const USBDescriptor vcom_strings[] = {
   {sizeof vcom_string0, vcom_string0},
   {sizeof vcom_string1, vcom_string1},
-  {sizeof vcom_string2, vcom_string2},
-  {sizeof vcom_string3, vcom_string3}
+  {sizeof vcom_string2, vcom_string2}
 };
+
+// Use unique serial string generated from MCU id
+#define UID_RADIX                5                 // Radix conversion constant (5 bit, use 0..9 and A..V)
+#define USB_SERIAL_STRING_SIZE  ((64 + UID_RADIX -1) / UID_RADIX)   // Result string size
+USBDescriptor *getSerialStringDescriptor(void) {
+  uint16_t i;
+  uint16_t *buf    = ((uint16_t *)&spi_buffer[ARRAY_COUNT(spi_buffer)]) - ((USB_SERIAL_STRING_SIZE + 3) & ~3); // 32 bit align
+  USBDescriptor *d = ((USBDescriptor *)buf) - 1;
+  uint32_t id0 = *(uint32_t *)0x1FFFF7AC; // MCU id0 address
+  uint32_t id1 = *(uint32_t *)0x1FFFF7B0; // MCU id1 address
+  uint32_t id2 = *(uint32_t *)0x1FFFF7B4; // MCU id2 address
+  uint64_t uid = id1;
+  uid = (id0 + id2) | (uid<<32);          // generate unique 64bit ID
+  // Prepare serial string descriptor from 64 bit ID
+  for(i = 1; i < USB_SERIAL_STRING_SIZE + 1; i++) {
+    uint16_t c = uid & ((1<<UID_RADIX) - 1);
+    buf[i] = c + (c < 0x0A ? '0' : 'A' - 0x0A);
+    uid>>= UID_RADIX;
+  }
+  uint16_t size = i * sizeof(uint16_t);
+  buf[0] = size | (USB_DESCRIPTOR_STRING << 8);
+  // Generate USBDescriptor structure
+  d->ud_size   = size;
+  d->ud_string = (uint8_t *)buf;
+  return d;
+}
 
 /*
  * Handles the GET_DESCRIPTOR callback. All required descriptors must be
@@ -262,7 +225,6 @@ static const USBDescriptor *get_descriptor(USBDriver *usbp,
                                            uint8_t dtype,
                                            uint8_t dindex,
                                            uint16_t lang) {
-
   (void)usbp;
   (void)lang;
   switch (dtype) {
@@ -271,7 +233,10 @@ static const USBDescriptor *get_descriptor(USBDriver *usbp,
   case USB_DESCRIPTOR_CONFIGURATION:
     return &vcom_configuration_descriptor;
   case USB_DESCRIPTOR_STRING:
-    if (dindex < 4)
+    // send unique USB serial string if need
+    if (dindex == STR_SERIAL)
+      return getSerialStringDescriptor();
+    if (dindex < STR_SERIAL)
       return &vcom_strings[dindex];
   }
   return NULL;
