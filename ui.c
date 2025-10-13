@@ -4368,6 +4368,32 @@ static UI_FUNCTION_ADV_CALLBACK(menu_mhz_csv_acb)
   config_save();
 }
 
+static UI_FUNCTION_ADV_CALLBACK(menu_sd_icon_save_capture_acb)
+{
+  (void)item;
+  (void)data;
+
+  if (b) {
+    b->icon = config.sd_icon_save & SDIS_CAPTURE ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    return;
+  }
+  config.sd_icon_save ^= SDIS_CAPTURE;
+  config_save();
+}
+
+static UI_FUNCTION_ADV_CALLBACK(menu_sd_icon_save_traces_acb)
+{
+  (void)item;
+  (void)data;
+
+  if (b) {
+    b->icon = config.sd_icon_save & SDIS_TRACES ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    return;
+  }
+  config.sd_icon_save ^= SDIS_TRACES;
+  config_save();
+}
+
 #ifdef __SD_FILE_BROWSER__
 #include "vna_browser.c"
 #endif
@@ -5331,6 +5357,19 @@ static const menuitem_t menu_stimulus[] = {
 };
 
 #ifdef __USE_SD_CARD__
+static const menuitem_t menu_storage_sd_icon[] = {
+  { MT_ADV_CALLBACK, 0,       "SAVE\nCAPTURE",     menu_sd_icon_save_capture_acb },
+  { MT_ADV_CALLBACK, 0,       "SAVE\nTRACES",      menu_sd_icon_save_traces_acb },
+  { MT_NONE,         0,       NULL,                menu_back }
+};
+
+static const menuitem_t menu_storage_config[] = {
+  { MT_ADV_CALLBACK, 0,       "AUTO NAME",              menu_autoname_acb },
+  { MT_ADV_CALLBACK, 0,       "MHz\nCSV",               menu_mhz_csv_acb },
+  { MT_SUBMENU,      0,       "SD CARD\nICON",          menu_storage_sd_icon },
+  { MT_NONE,         0,       NULL,                     menu_back }
+};
+
 static const menuitem_t menu_storage[] = {
 #ifdef __SD_FILE_BROWSER__
   { MT_CALLBACK, FMT_BMP_FILE,      "LOAD\nCAPTURE",        menu_sdcard_browse_cb },
@@ -5338,12 +5377,11 @@ static const menuitem_t menu_storage[] = {
   { MT_CALLBACK, FMT_CMD_FILE,      "LOAD\nCMD",             menu_sdcard_browse_cb },
   { MT_CALLBACK, FMT_CFG_FILE,      "LOAD\nCONFIG",          menu_sdcard_browse_cb },
 #endif
-  { MT_ADV_CALLBACK, 0,             "AUTO NAME",            menu_autoname_acb },
   { MT_CALLBACK,    FMT_BMP_FILE,   "SAVE\nCAPTURE",        menu_sdcard_cb},
   { MT_CALLBACK,    FMT_PRS_FILE,   "SAVE\nSETTINGS",       menu_sdcard_cb},
   { MT_CALLBACK,    FMT_CFG_FILE,   "SAVE\nCONFIG",         menu_sdcard_cb},
-  { MT_ADV_CALLBACK, 0,             "MHz\nCSV",             menu_mhz_csv_acb },
   { MT_CALLBACK,    FMT_CSV_FILE,   "SAVE\nTRACES",         menu_save_traces_cb},
+  { MT_SUBMENU,     0,              "CONFIG",               menu_storage_config },
 //  { MT_KEYPAD,      KM_INTERVAL,    "INTERVAL\n\b%s",       NULL },
   { MT_NONE,    0, NULL, menu_back} // next-> menu_back
 };
@@ -8073,7 +8111,10 @@ made_screenshot(int touch_x, int touch_y) {
   ili9341_set_background(LCD_BG_COLOR);
   ili9341_fill(4, SD_CARD_START, 16, 16);
   touch_wait_release();
-  menu_sdcard_cb(0, FMT_BMP_FILE);
+  if (config.sd_icon_save & SDIS_CAPTURE)
+    menu_sdcard_cb(0, FMT_BMP_FILE);
+  if (config.sd_icon_save & SDIS_TRACES)
+    menu_save_traces_cb(0, 0);
   return TRUE;
 }
 #endif
@@ -8193,7 +8234,7 @@ void ui_process_touch(void)
     switch (ui_mode) {
     case UI_NORMAL:
 #ifdef __USE_SD_CARD__
-      if (made_screenshot(touch_x, touch_y))
+      if (SDIS_IS_ENABLED && made_screenshot(touch_x, touch_y))
         break;
 #endif
       if (touch_quick_menu(touch_x, touch_y))

@@ -121,6 +121,13 @@ config_recall(void)
 
   /* duplicated saved data onto sram to be able to modify marker/trace */
   memcpy(dst, src, sizeof(config_t));
+
+#ifdef __USE_SD_CARD__
+  // Migrate from old config without sd_icon_save member
+  if (config.sd_icon_save == 0)
+    config.sd_icon_save = SDIS_DEFAULT;
+#endif // __USE_SD_CARD__
+
   return 0;
 }
 

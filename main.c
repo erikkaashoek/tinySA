@@ -1237,6 +1237,9 @@ config_t config = {
   .overclock = 0,
   .hide_21MHz = false,
 #endif
+#ifdef __USE_SD_CARD__
+  .sd_icon_save = SDIS_DEFAULT,
+#endif // __USE_SD_CARD__
 };
 
 
