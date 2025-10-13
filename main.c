@@ -2243,6 +2243,8 @@ const char *get_hw_version_text(void)
   hw_if = 0;
   return "Unknown";
 }
+#else
+const char *hw_text = "ZS304";
 #endif
 
 VNA_SHELL_FUNCTION(cmd_version)

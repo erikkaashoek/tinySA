@@ -602,7 +602,9 @@ VNA_SHELL_FUNCTION(cmd_rbw)
 
 VNA_SHELL_FUNCTION(cmd_if)
 {
+#ifdef TINYSA4
   char *t = "975M..979M";
+#endif
   if (argc != 1 || argv[0][0] == '?') {
   usage:
 #ifdef TINYSA4
@@ -616,8 +618,10 @@ VNA_SHELL_FUNCTION(cmd_if)
   }
   freq_t a = (freq_t)my_atoi(argv[0]);
   freq_t f = DEFAULT_IF;
+#ifdef TINYSA4
   if (hw_if)
     f = DEFAULT_IF_PLUS;
+#endif
   if (a!= 0 &&( a < (f - (freq_t)5000000) || a>(f + (freq_t)5000000)))
     goto usage;
   setting.auto_IF = false;
