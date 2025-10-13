@@ -1995,7 +1995,7 @@ static const uint8_t sd_icon [] = {
   _BMP16(0b0101010101011000),  //14
   _BMP16(0b0111111111111000)   //
   };
-  if (SD_Inserted()){
+  if (SD_Inserted() && SDIS_IS_ENABLED) {
     ili9341_set_foreground(LCD_BRIGHT_COLOR_GREEN);
     ili9341_blitBitmap(4, SD_CARD_START, 16, 16, sd_icon);
 //  ili9341_drawstring("-SD-", x, SD_CARD_START);

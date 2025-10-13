@@ -801,6 +801,18 @@ float marker_to_value(const int i);
 #define _MODE_AUTO_FILENAME    0x10
 #define _MODE_MHZ_CSV          0x20
 
+#ifdef __USE_SD_CARD__
+// SD Icon Save (SDIS) configuration
+#define SDIS_CAPTURE (1 << 0)
+#define SDIS_TRACES (1 << 1)
+// Validity mask is needed to distinguish disabled SD card icon saving
+// from the case with old config that does not have sd_icon_save member
+// (the corresponding padding byte was always equal to zero)
+#define SDIS_VALID_MASK (1 << 7)
+#define SDIS_DEFAULT (SDIS_CAPTURE | SDIS_VALID_MASK)
+#define SDIS_IS_ENABLED ((config.sd_icon_save & ~SDIS_VALID_MASK) != 0)
+#endif // __USE_SD_CARD__
+
 #pragma pack(push, 4)
 typedef struct config {
   int32_t magic;
@@ -882,6 +894,9 @@ typedef struct config {
   uint8_t hide_21MHz;
   uint8_t no_audio_agc;
 #endif
+#ifdef __USE_SD_CARD__
+  uint8_t sd_icon_save;   // enum
+#endif // __USE_SD_CARD__
   float sweep_voltage;
   float switch_offset;
   int16_t   ext_zero_level;
