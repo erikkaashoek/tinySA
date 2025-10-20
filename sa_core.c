@@ -124,7 +124,7 @@ int actual_drive = -1;
 #define BELOW_MAX_DRIVE(X) (drive_dBm[X] - drive_dBm[MAX_DRIVE])
 
 #ifdef TINYSA4
-const float si_drive_dBm []     = {-44.1, -30, -21.6, -17, -14, -11.7, -9.9, -8.4, -7.1, -6, -5, -4.2, -3.4, -2.7 , -2.1,  -1.5,  -1, -0.47, 0};
+const float si_drive_dBm []     = {-41.1, -30, -21.6, -17, -14, -11.7, -9.9, -8.4, -7.1, -6, -5, -4.2, -3.4, -2.7 , -2.1,  -1.5,  -1, -0.47, 0};
 //const float adf_drive_dBm[]     = {-13,-7.5,-4.2, 0};
 //const float adf_drive_dBm[]     = {-9, -4, 0, 0};
 const float adf_drive_dBm[]     = {0, 0, 0, 0};     // Only use drive 0
