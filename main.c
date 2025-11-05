@@ -498,7 +498,7 @@ VNA_SHELL_FUNCTION(cmd_wait)
     return;
   }
   break_execute = false;
-  drawMessageBox("Info", "Waiting", 0) ;
+//  drawMessageBox("Info", "Waiting", 0) ;
   if (argc == 1) {
     uint32_t t = my_atoi(argv[0]);
     while (t > 0 && !break_execute) {
@@ -513,7 +513,30 @@ VNA_SHELL_FUNCTION(cmd_wait)
     }
   }
   redraw_request|= REDRAW_AREA|REDRAW_FREQUENCY;
-  draw_all(true);
+//  draw_all(true);  // causes stack overflow
+}
+
+VNA_SHELL_FUNCTION(cmd_waitscan)
+{
+  (void)argc;
+  (void)argv;
+  uint32_t count = 1;
+  if (argc == 1 && argv[0][0] == '?') {
+    usage_printf("waitscan [{scans}]\r\n");
+    return;
+  }
+  break_execute = false;
+  pause_sweep();
+//  drawMessageBox("Info", "Waiting", 0) ;
+  if (argc == 1) {
+    count = my_atoi(argv[0]);
+  }
+  resume_once(count) ;
+  while (!is_paused() && !break_execute) {
+    chThdSleepMilliseconds(100);
+  }
+  redraw_request|= REDRAW_AREA|REDRAW_FREQUENCY;
+//  draw_all(true);  // causes stack overflow
 }
 
 VNA_SHELL_FUNCTION(cmd_repeat)
@@ -1377,8 +1400,13 @@ VNA_SHELL_FUNCTION(cmd_scan)
   freq_t stop  = get_sweep_frequency(ST_STOP);
   uint32_t old_points = sweep_points;
   uint32_t i;
+  int repeat = 1;
   if (argc == 0)
     goto do_scan;
+  if (argc == 1) {
+    repeat = my_atoi(argv[0]);
+    goto do_scan;
+  }
   if (argc < 2 || argc > 4) {
     usage_printf("scan {start(Hz)} {stop(Hz)} [points] [outmask]\r\n");
     return;
@@ -1404,6 +1432,9 @@ do_scan:
   setting.sweep = true;         // prevent abort
   sweep(true);
   setting.sweep = false;
+  repeat -= 1;
+  if (repeat > 0)
+    goto do_scan;
   // Output data after if set (faster data recive)
   if (argc == 4 && !operation_requested) {
     uint16_t mask = my_atoui(argv[3]);
@@ -2434,6 +2465,7 @@ static const VNAShellCommand commands[] =
 #endif
     {"resume"      , cmd_resume      , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
     {"wait"        , cmd_wait        , CMD_RUN_IN_LOAD},                                 // This lets the sweep continue
+    {"waitscan"    , cmd_waitscan    , CMD_RUN_IN_LOAD},                                 // This lets the sweep continue
     {"repeat"      , cmd_repeat      , CMD_RUN_IN_LOAD},
     {"status"      , cmd_status      , CMD_RUN_IN_LOAD},
     {"caloutput"   , cmd_caloutput   , CMD_RUN_IN_LOAD},
@@ -2885,7 +2917,7 @@ void sd_card_load_config(char *filename){
 #endif
 
 #ifdef VNA_SHELL_THREAD
-static THD_WORKING_AREA(waThread2, /* cmd_* max stack size + alpha */442);
+static THD_WORKING_AREA(waThread2, /* cmd_* max stack size + alpha */450);
 THD_FUNCTION(myshellThread, p)
 {
   (void)p;
