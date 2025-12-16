@@ -2716,6 +2716,10 @@ static bool shell_check_connect(void){
 // Init shell I/O connection over USB
 static void shell_init_connection(void){
 /*
+ * Init shell thread object (need for switch threads)
+ */
+  osalThreadQueueObjectInit(&shell_thread);
+/*
  * Initializes and start serial-over-USB CDC driver SDU1, connected to USBD1
  */
   sduObjectInit(&SDU1);
