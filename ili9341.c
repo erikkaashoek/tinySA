@@ -1427,7 +1427,7 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
   uint8_t buf[6];
   volatile uint8_t r1;
   // wait SD ready after last Tx (recommended timeout is 250ms (500ms for SDXC) set 250ms
-  if ((r1 = SD_WaitNotBusy(MS2ST(250))) != 0xFF) {
+  if ((r1 = SD_WaitNotBusy(MS2ST(500))) != 0xFF) {
     DEBUG_PRINT(" SD_WaitNotBusy CMD%d err, %02x\r\n", cmd-0x40, (uint32_t)r1);
     return 0xFF;
   }
@@ -1444,8 +1444,8 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
   buf[5] = crc7(buf, 5)|0x01;
 #else
   uint8_t crc = 0x01;              // Dummy CRC + Stop
-       if (cmd == CMD0) crc = 0x94;// Valid CRC for CMD0(0)
-  else if (cmd == CMD8) crc = 0x86;// Valid CRC for CMD8(0x1AA)
+       if (cmd == CMD0) crc = 0x95;// Valid CRC for CMD0(0)
+  else if (cmd == CMD8) crc = 0x87;// Valid CRC for CMD8(0x1AA)
   buf[5] = crc;
 #endif
   spi_TxBuffer(buf, 6);
@@ -1474,10 +1474,11 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
 // Power on SD
 static void SD_PowerOn(void) {
   uint16_t n;
-  SD_Select_SPI_LOW();
+  LCD_CS_HIGH;
   // Dummy TxRx 80 bits for power up SD
   for (n=0;n<10;n++)
     spi_RxByte();
+  SD_Select_SPI_LOW();
   // Set SD card to idle state
   if (SD_SendCmd(CMD0, 0) == SD_R1_IDLE)
     Stat|= STA_POWER_ON;
