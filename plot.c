@@ -334,8 +334,8 @@ marker_to_value(const int i)
 #endif
     )
       setting.unit = U_WATT;            // Noise averaging should always be done in Watts
-    v = 0;
-    for (int i=0; i<sweep_points; i++)
+    v = value(ref_marker_levels[0])
+    for (int i=sweep_points-1; i != 0; i--) 
       v += value(ref_marker_levels[i]); // TODO this should be power averaging for noise markers
     v /= sweep_points;
     v = to_dBm(v);
@@ -1152,7 +1152,9 @@ draw_cell(int m, int n)
     c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
     for (x = 0; x < w; x++)
       if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
-        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
+        for (y = h-1; y != 0; y--) 
+            cell_buffer[y * CELLWIDTH + x] = c;
+        cell_buffer[CELLWIDTH + x] = c;
     }
   }
 #endif
@@ -2060,16 +2062,19 @@ int display_test_pattern(pixel_t p)
   // write and read display, return false on fail.
   for (int h = 0; h < LCD_HEIGHT; h++) {
     // write test pattern to LCD
-    for (int w = 0; w < LCD_WIDTH; w++)
+    for (int w = LCD_WIDTH-1; w != 0; w--)
       spi_buffer[w] = p;
+    spi_buffer[0] = p;
     ili9341_bulk(0, h, LCD_WIDTH, 1);
     // Cleanup buffer
     memset(spi_buffer, 0, LCD_WIDTH * sizeof(pixel_t));
     // try read data
     ili9341_read_memory(0, h, LCD_WIDTH, 1, spi_buffer);
     // Check pattern from data    for (volatile int w = 0; w < LCD_WIDTH; w++)
-    for (int w = 0; w < LCD_WIDTH; w++)
+    for (int w = LCD_WIDTH-1; w != 0; w--)
       if (spi_buffer[w] != p)
+        return false;
+    if (spi_buffer[0] != p) 
         return false;
   }
   return true;
