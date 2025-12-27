@@ -232,7 +232,7 @@ bool PE4302_Write_Byte(unsigned char DATA )
   if (SI4432_SPI_SPEED != PE_SPI_SPEED)
     SPI_BR_SET(SI4432_SPI, PE_SPI_SPEED);
   SPI_WRITE_8BIT(SI4432_SPI, DATA);
-  while (SPI_IS_BUSY(SI4432_SPI));
+  while (SPI_IS_BUSY(SI4432_SPI)) {};
 #else                               // Run PE4312 in SW mode to avoid disturbances
   set_SPI_mode(SPI_MODE_PE);
   software_shiftOut(DATA);
@@ -403,7 +403,7 @@ void ADF4351_Latch(void)
 {
   if (ADF4351_dirty == false)
     return;
-  while (SPI_IS_BUSY(SI4432_SPI)); // drop rx and wait tx
+  while (SPI_IS_BUSY(SI4432_SPI)) {}; // drop rx and wait tx
   CS_ADF0_HIGH;
 }
 
@@ -522,7 +522,7 @@ freq_t xtal;
 
 uint64_t ADF4351_set_frequency(int channel, uint64_t freqHz) {
   (void) channel;
-  // RFout = xtalFreqHz × (N + FRAC/MOD) = xtalFreqHz × (N * MOD + FRAC) / MOD
+  // RFout = xtalFreqHz ï¿½ (N + FRAC/MOD) = xtalFreqHz ï¿½ (N * MOD + FRAC) / MOD
   // step = xtalFreqHz / MOD; !!!! should get integer result, also this result should divided by 16
   // for 24M step = 24M / 4000 = 6k and 6k/16 = 375
   // Nx = RFout / step
@@ -1310,7 +1310,7 @@ void SI4463_do_first_api(void* data, uint8_t len, void* out, uint8_t outLen)
     while (SPI_TX_IS_NOT_EMPTY(SI4432_SPI));
     SPI_WRITE_8BIT(SI4432_SPI, *ptr++);
   }
-  while (SPI_IS_BUSY(SI4432_SPI));
+  while (SPI_IS_BUSY(SI4432_SPI)) {};
 #else
   while (len--)
     shiftOut(*ptr++); // (pgm_read_byte(&((uint8_t*)data)[i]));
@@ -1359,7 +1359,7 @@ int SI4463_do_api(void* data, uint8_t len, void* out, uint8_t outLen)
     while (SPI_TX_IS_NOT_EMPTY(SI4432_SPI));
     SPI_WRITE_8BIT(SI4432_SPI, *ptr++);
   }
-  while (SPI_IS_BUSY(SI4432_SPI));
+  while (SPI_IS_BUSY(SI4432_SPI)) {};
 #else
   while (len--)
     shiftOut(*ptr++); // (pgm_read_byte(&((uint8_t*)data)[i]));
