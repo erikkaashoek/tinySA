@@ -259,16 +259,27 @@ static THD_FUNCTION(Thread1, arg)
     }
 //  STOP_PROFILE
     // Run Shell command in sweep thread
-    if (shell_function) {
-      operation_requested = OP_NONE; // otherwise commands  will be aborted
-      do {
-        shell_function(shell_nargs - 1, &shell_args[1]);
-        shell_function = 0;
-        if (operation_requested == OP_NONE) // Don't prompt if aborted
-          shell_printf(VNA_SHELL_PROMPT_STR);
-        // Resume shell thread
-        if (!abort_enabled) osalThreadDequeueNextI(&shell_thread, MSG_OK);
-      } while (shell_function);
+    vna_shellcmd_t local_func;
+
+    chSysLock();
+    local_func = shell_function;
+    shell_function = 0;
+    chSysUnlock();
+
+    if (local_func) {
+      operation_requested = OP_NONE; // otherwise commands will be aborted
+      local_func(shell_nargs - 1, &shell_args[1]);
+
+      if (operation_requested == OP_NONE) // Don't prompt if aborted
+        shell_printf(VNA_SHELL_PROMPT_STR);
+
+      // Resume shell thread
+      if (!abort_enabled) {
+        chSysLock();
+        osalThreadDequeueNextI(&shell_thread, MSG_OK);
+        chSysUnlock();
+      }
+
       if (dirty) {
         if (MODE_OUTPUT(setting.mode))
           draw_menu();    // update screen if in output mode and dirty
@@ -2834,12 +2845,26 @@ static void VNAShell_executeLine(char *line)
     // Skip wait mutex if process UI
     if ((cmd_flag & CMD_RUN_IN_UI) && (sweep_mode&SWEEP_UI_MODE)) cmd_flag&=~CMD_WAIT_MUTEX;
     if (cmd_flag & CMD_WAIT_MUTEX) {
+      chSysLock();
       shell_function = scp->sc_function;
       operation_requested|=OP_CONSOLE;      // this will abort current sweep to give priority to the new request
+      chSysUnlock();
       // Wait execute command in sweep thread
       if (!abort_enabled && shell_function != 0){
+        int timeout_count = 0;
+        msg_t result;
         do {
-          osalThreadEnqueueTimeoutS(&shell_thread, TIME_INFINITE);
+          result = osalThreadEnqueueTimeoutS(&shell_thread, MS2ST(5000));  // 5 second timeout
+          if (result == MSG_TIMEOUT) {
+            timeout_count++;
+            if (timeout_count > 3) {
+              shell_printf("Command timeout\r\n");
+              chSysLock();
+              shell_function = 0;  // clear stuck command
+              chSysUnlock();
+              break;
+            }
+          }
         } while (shell_function);
       }
     } else {
