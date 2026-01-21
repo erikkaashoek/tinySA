@@ -610,10 +610,10 @@ VNA_SHELL_FUNCTION(cmd_if)
 #ifdef TINYSA4
   if (hw_if)
     t = "1067M..1073M";
-  usage_printf("usage: if {%s}\r\n%QHz\r\n", t, setting.frequency_IF);
 #else
-    usage_printf("usage: if {433M..435M}\r\n%QHz\r\n", setting.frequency_IF);
+    t = "433M..435M";
 #endif
+  usage_printf("usage: if {%s}\r\n%QHz\r\n", t, setting.frequency_IF);
     return;
   }
   freq_t a = (freq_t)my_atoi(argv[0]);
