@@ -2264,7 +2264,13 @@ char *hw_text = "";
 
 const char *get_hw_version_text(void)
 {
+  int v2 = -100;
   int v = adc1_single_read(0);
+  while (v-v2 < -20 || v-v2 > +20) {
+    v2 = v;
+    chThdSleepMilliseconds(1);
+    v = adc1_single_read(0);
+  }
   for (int i=0; i<MAX_VERSION_TEXT;i++) {
     if (hw_version_text[i].min_adc <= v && v <= hw_version_text[i].max_adc) {
       hwid = hw_version_text[i].hwid;
