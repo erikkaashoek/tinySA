@@ -1484,8 +1484,9 @@ void copy_trace(int f, int t)
 {
   if (f == t)
     return;
-  for (int i=0; i<POINTS_COUNT;i++)
+  for (int i = POINTS_COUNT-1; i != 0; i--)
     measured[t][i] = measured[f][i];
+  measured[t][0] = measured[f][0];
   setting.stored[t] = true;
   //dirty = true;             // No HW update required, only status panel refresh
 }
@@ -1529,12 +1530,13 @@ void subtract_trace(int t, int f)
     setting.subtract[t] = f+1;
     setting.normalize_level = 0.0;
     setting.auto_attenuation = false;       // Otherwise noise level may move leading to strange measurements
-    for (int i=0;i<POINTS_COUNT;i++)
+    for (int i = POINTS_COUNT-1; i != 0; i--)
        measured[t][i] -= measured[f][i];                   // pre-load AVER
-
+    measured[t][0] -= measured[f][0];
   } else {
-    for (int i=0;i<POINTS_COUNT;i++)
+    for (int i = POINTS_COUNT-1; i != 0; i--)
       measured[t][i] += measured[f][i];                   // pre-load AVER
+    measured[t][0] += measured[f][0];
     setting.subtract[t] = 0;
   }
 }
@@ -1548,15 +1550,17 @@ void toggle_normalize(int t)
       TRACE_DISABLE(1<<TRACE_TEMP);
     }
     setting.normalized[t] = true;
-    for (int i=0;i<POINTS_COUNT;i++)
+    for (int i = POINTS_COUNT - 1; i != 0; i--)
       measured[t][i] -= measured[TRACE_TEMP][i];                   // pre-load AVER
+    measured[t][0] -= measured[TRACE_TEMP][0];
     setting.auto_attenuation = false;       // Otherwise noise level may move leading to strange measurements
     setting.normalize_level = 0.0;
   } else {
     for (int f=0; f<TRACES_MAX-1;f++) {
       if (setting.normalized[f] && (setting.normalized_trace == t || f == t)) {
-        for (int i=0;i<POINTS_COUNT;i++)
+        for (int i = POINTS_COUNT - 1; i != 0; i--)
           measured[f][i] += measured[TRACE_TEMP][i];                   // pre-load AVER
+        measured[f][0] += measured[TRACE_TEMP][0];
         setting.normalized[f] = false;
       }
     }
@@ -2247,13 +2251,13 @@ static const int8_t scaled_atten_correction[16][16] =
 static void calculate_correction(void)
 {
   for (int c = 0; c < CORRECTION_SIZE; c++) {
-  scaled_correction_value[c][0] = config.correction_value[c][0]  * (1 << (SCALE_FACTOR));
-  for (int i = 1; i < CORRECTION_POINTS; i++) {
-    scaled_correction_value[c][i] = config.correction_value[c][i]  * (1 << (SCALE_FACTOR));
-    int32_t m = scaled_correction_value[c][i] - scaled_correction_value[c][i-1];
-//    int32_t d = (setting.correction_frequency[i] - setting.correction_frequency[i-1]) >> SCALE_FACTOR;
-    scaled_correction_multi[c][i] = m; // (int32_t) ( m / d );
-  }
+    scaled_correction_value[c][0] = config.correction_value[c][0]  * (1 << (SCALE_FACTOR));
+    for (int i = 1; i < CORRECTION_POINTS; i++) {
+      scaled_correction_value[c][i] = config.correction_value[c][i]  * (1 << (SCALE_FACTOR));
+      int32_t m = scaled_correction_value[c][i] - scaled_correction_value[c][i-1];
+  //    int32_t d = (setting.correction_frequency[i] - setting.correction_frequency[i-1]) >> SCALE_FACTOR;
+      scaled_correction_multi[c][i] = m; // (int32_t) ( m / d );
+    }
   }
 }
 #pragma GCC push_options
@@ -3781,8 +3785,9 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     }
   }
   if (i == 0) {
-    for (int t=0;t<TRACES_MAX;t++)
+    for (int t = TRACES_MAX-1; t != 0; t--)
       setting.scan_after_dirty[t] += 1;
+    setting.scan_after_dirty[0] += 1;
   }
   TRACE(0);
   // ---------------------------------  Pulse at start of low output sweep --------------------------
@@ -5314,9 +5319,10 @@ static bool sweep(bool break_on_operation)
         imag[i] = 0;
         actual_t[i] = -150;
       }
-      for (int i=0;i<sweep_points;i++) {
+      for (int i=sweep_points-1;i != 0; i--) {
         real[i] = temp_t[i] - m;
       }
+      real[0] = temp_t[0] - m;
       FFT(real, imag, 256, false);
 #if 1
       for (int i = 128 - setting.vbw_x100; i<128+setting.vbw_x100; i++) {
@@ -5326,11 +5332,13 @@ static bool sweep(bool break_on_operation)
 #endif
       FFT(real, imag, 256, true);
 
-      for (int i=0;i<sweep_points;i++) {
+      for (int i=sweep_points-1;i != 0; i--) {
         float re = real[i];
         temp_t[i] = re + m;
 //        actual_t[i] = sqrtf(re*re + im*im) + m;
       }
+      float re = real[0];
+      temp_t[0] = re + m;
     }
 #else
 
@@ -5363,12 +5371,15 @@ static bool sweep(bool break_on_operation)
       d_width = (sweep_points * (actual_rbw_x10 * 250) / get_sweep_frequency(ST_SPAN));
       d_start = sweep_points/2 - d_width/2;
       d_offset = stored_t[d_start];
-      for (int i=0; i<d_width; i++)
+      for (int i = d_width-1; i != 0; i--)
         if (d_offset > stored_t[d_start + i])
           d_offset = stored_t[d_start + i];
+      if (d_offset > stored_t[d_start])
+          d_offset = stored_t[d_start];
 //      d_offset -= 1;    // To avoid divide by zero
-      for (int i=0; i<d_width; i++)
+      for (int i = d_width - 1; i != 0; i--)
         d_scale += stored_t[d_start + i] - d_offset;
+      d_scale += stored_t[d_start] - d_offset;
 //      d_scale *= d_wid;
     }
 #endif
@@ -5385,10 +5396,12 @@ static bool sweep(bool break_on_operation)
         imag2[i] = 0;
         actual_t[i] = -150;
       }
-      for (int i=0;i<sweep_points;i++) {
+      for (int i = sweep_points-1; i != 0 ; i--) {
         if (temp_t[i] > m+25)
           real[i] = temp_t[i] - m;
       }
+      if (temp_t[0] > m + 25)
+          real[0] = temp_t[0] - m;
       FFT(real, imag, 256, false);
 #if 1
 #if 0
@@ -6069,8 +6082,8 @@ static volatile int dummy;
   trace[TRACE_STORED].enabled = true;
   adc_buf_read(ADC_CHSELR_CHSEL4, spi_buffer, 290);
 #if 1           // Perform FFT on input
-  int32_t zero = 0;
-  for (int i=0;i<256;i++) {
+  int32_t zero = spi_buffer[0];
+  for (int i=255;i!=0;i--) {
     zero += spi_buffer[i];
   }
   zero = zero >> 8;
@@ -6715,10 +6728,10 @@ float measure_jump(int i) {
   (void) i;
   redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
   draw_all(TRUE);
-  float left=0,
-      right = 0;
+  float left = actual_t[0];
+  float right = 0;
   int h_p = setting._sweep_points/2;
-  for (int j = 0; j < h_p; j++) {
+  for (int j = h_p - 1; j != 0; j--) {
     left += actual_t[j];
   }
   left /= h_p;
