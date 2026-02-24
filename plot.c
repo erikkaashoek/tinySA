@@ -1940,11 +1940,21 @@ draw_frequencies(void)
     plot_printf(buf2, sizeof(buf2), " TIME %.3Fs", (float)t/ONE_SECOND_TIME);
 
   } else if (FREQ_IS_STARTSTOP()) {
+#ifdef TINYSA4
+    plot_printf(buf1, sizeof(buf1), " START %.6QHz    %5.1QHz/ %s", get_sweep_frequency(ST_START) + (setting.frequency_offset - FREQUENCY_SHIFT), grid_span, shift);
+    plot_printf(buf2, sizeof(buf2), " STOP %.6QHz", get_sweep_frequency(ST_STOP) + (setting.frequency_offset - FREQUENCY_SHIFT));
+#else
     plot_printf(buf1, sizeof(buf1), " START %.3QHz    %5.1QHz/ %s", get_sweep_frequency(ST_START) + (setting.frequency_offset - FREQUENCY_SHIFT), grid_span, shift);
     plot_printf(buf2, sizeof(buf2), " STOP %.3QHz", get_sweep_frequency(ST_STOP) + (setting.frequency_offset - FREQUENCY_SHIFT));
+#endif
   } else if (FREQ_IS_CENTERSPAN()) {
+#ifdef TINYSA4
+    plot_printf(buf1, sizeof(buf1), " CENTER %.6QHz    %5.1QHz/ %s", get_sweep_frequency(ST_CENTER) + (setting.frequency_offset - FREQUENCY_SHIFT), grid_span, shift);
+    plot_printf(buf2, sizeof(buf2), " SPAN %.6QHz", get_sweep_frequency(ST_SPAN));
+#else
     plot_printf(buf1, sizeof(buf1), " CENTER %.3QHz    %5.1QHz/ %s", get_sweep_frequency(ST_CENTER) + (setting.frequency_offset - FREQUENCY_SHIFT), grid_span, shift);
     plot_printf(buf2, sizeof(buf2), " SPAN %.3QHz", get_sweep_frequency(ST_SPAN));
+#endif
   }
   ili9341_set_foreground(LCD_FG_COLOR);
   ili9341_set_background(LCD_BG_COLOR);

@@ -1595,7 +1595,7 @@ static const menuitem_t  menu_settings3[];
 static const menuitem_t  menu_measure_noise_figure[];
 static const menuitem_t  menu_calibrate_harmonic[];
 static const menuitem_t  menu_calibrate_normal[];
-static const menuitem_t  menu_calibrate_max[];
+//static const menuitem_t  menu_calibrate_max[];
 #endif
 static const menuitem_t  menu_calibrate[];
 static const menuitem_t  menu_sweep[];
@@ -5452,35 +5452,54 @@ static void menu_item_modify_attribute(                     // To modify menu bu
 
 static void fetch_numeric_target(uint8_t mode)
 {
+  char *out_format = "%.3QHz";
   switch (mode) {
   case KM_START:
     uistat.freq_value = get_sweep_frequency(ST_START) + (setting.frequency_offset - FREQUENCY_SHIFT);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_STOP:
     uistat.freq_value = get_sweep_frequency(ST_STOP) + (setting.frequency_offset - FREQUENCY_SHIFT);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_CENTER:
     uistat.freq_value = get_sweep_frequency(ST_CENTER) + (setting.frequency_offset - FREQUENCY_SHIFT);
-    char *out_format = "%.3QHz";
 #ifdef TINYSA4
     if (MODE_OUTPUT(setting.mode)) {
       if (uistat.freq_value > 990000000UL)
         out_format = "%.9QHz";
       else if (uistat.freq_value > 990000UL)
-        out_format = "%.6QHz";
-    }
+        out_format = "%.6Q";
+    } else
+      if (uistat.freq_value >= 1e9)
+        out_format = "%.6Q";
+
 #endif
     plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_SPAN:
     uistat.freq_value = get_sweep_frequency(ST_SPAN);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_CW:
     uistat.freq_value = get_sweep_frequency(ST_CW) + (setting.frequency_offset - FREQUENCY_SHIFT);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_SCALE:
   case KM_LINEAR_SCALE:
@@ -5631,19 +5650,35 @@ static void fetch_numeric_target(uint8_t mode)
 #ifdef __BANDS__
   case KM_BAND_START:
     uistat.freq_value = setting.bands[active_band].start + (setting.frequency_offset - FREQUENCY_SHIFT);;
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_BAND_END:
     uistat.freq_value = setting.bands[active_band].end + (setting.frequency_offset - FREQUENCY_SHIFT);;
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_BAND_CENTER:
     uistat.freq_value = (setting.bands[active_band].end + setting.bands[active_band].start)/2 + (setting.frequency_offset - FREQUENCY_SHIFT);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_BAND_SPAN:
-    uistat.freq_value = abs(setting.bands[active_band].end-setting.bands[active_band].start);
-    plot_printf(uistat.text, sizeof uistat.text, "%.3QHz", uistat.freq_value);
+    uistat.freq_value = abs((long)setting.bands[active_band].end-(long)setting.bands[active_band].start);
+#ifdef TINYSA4
+    if (uistat.freq_value > 990000000UL)
+      out_format = "%.6Q";
+#endif
+    plot_printf(uistat.text, sizeof uistat.text, out_format, uistat.freq_value);
     break;
   case KM_BAND_LEVEL:
     uistat.value = value(setting.bands[active_band].level);
@@ -5927,7 +5962,7 @@ set_numeric_value(void)
     break;
   case KM_BAND_CENTER:
   {
-    freq_t span = abs(setting.bands[active_band].end - setting.bands[active_band].start);
+    freq_t span = abs((long)setting.bands[active_band].end - (long)setting.bands[active_band].start);
     freq_t center = uistat.freq_value - (setting.frequency_offset - FREQUENCY_SHIFT);
     setting.bands[active_band].start = center - span/2;
     setting.bands[active_band].end = center + span/2;
@@ -6451,7 +6486,7 @@ redraw_cal_status:
   // Compact status string
 //  ili9341_set_background(LCD_FG_COLOR);
   ili9341_set_foreground(LCD_FG_COLOR);
-  strncpy(buf,"      ",BLEN-1);
+  strncpy(buf,"     ",BLEN-1);
   if (setting.auto_IF)
     buf[0] = 'f';
   else
