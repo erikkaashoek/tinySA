@@ -893,6 +893,7 @@ typedef struct config {
 #ifdef TINYSA4
   uint8_t hide_21MHz;
   uint8_t no_audio_agc;
+  uint8_t wfm_1khz_harmonic;  // 0=off, 1-100=amplitude percentage for adding ~1kHz harmonic to low freq WFM
 #endif
 #ifdef __USE_SD_CARD__
   uint8_t sd_icon_save;   // enum

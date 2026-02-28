@@ -1259,6 +1259,7 @@ config_t config = {
   .direct_stop  = 985000000UL,
   .overclock = 0,
   .hide_21MHz = false,
+  .wfm_1khz_harmonic = 0,  // Disabled by default; 0=off, 1-100=amplitude percentage for ~1kHz harmonic
 #endif
 #ifdef __USE_SD_CARD__
   .sd_icon_save = SDIS_DEFAULT,

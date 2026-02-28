@@ -71,7 +71,7 @@ freq_t frequency_step_x10 = 0;
 uint16_t vbwSteps = 1;
 freq_t minFreq = 0;
 freq_t maxFreq = 520000000;
-static float old_a = -150;          // cached value to reduce writes to level registers
+static float prev_output_level_dBm = -150;  // cached output level to reduce redundant hardware writes
 int spur_gate = 100;
 
 #ifdef __BANDS__
@@ -3672,7 +3672,7 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     set_calibration_freq(setting.refer);
     update_rbw();
     calculate_step_delay();
-    old_a = -150;                                                   // clear cached level setting
+    prev_output_level_dBm = -150;                               // clear cached level setting
     // Initialize HW
     scandirty = true;                                                       // This is the first pass with new settings
     for (int t=0;t<TRACES_MAX;t++)
@@ -3752,11 +3752,26 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
           modulation_steps >>= 1;
         }
         if (modulation_steps >= 4) {
+          int hn = (config.wfm_1khz_harmonic > 0 && setting.modulation_frequency < 250.0) ? (int)((1000.0 / setting.modulation_frequency) + 0.5) : 0;
           for (int i = 0; i < modulation_steps/4+1; i++) {
             fm_modulation[i] = setting.modulation_deviation_div100 * sine_wave[i*sine_wave_index]/100;
             fm_modulation[modulation_steps/2 - i] = fm_modulation[i];
             fm_modulation[modulation_steps/2 + i] = -fm_modulation[i];
             fm_modulation[modulation_steps - i] = -fm_modulation[i];
+          }
+          if (hn) {
+            for (int i = 0; i < modulation_steps; i++) {
+              int table_index = (i*sine_wave_index*hn) % MAX_MODULATION_STEPS;
+              int mul = 1;
+              if (table_index > MAX_MODULATION_STEPS/2) {
+                mul = -1;
+                table_index = MAX_MODULATION_STEPS - table_index;
+              }
+              if (table_index > MAX_MODULATION_STEPS/4)
+                table_index = MAX_MODULATION_STEPS/2 - table_index;
+              int v = setting.modulation_deviation_div100 * sine_wave[table_index] * mul / 100;
+              fm_modulation[i] += v;
+            }
           }
         } else {
           modulation_steps = 2;
@@ -3847,71 +3862,91 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     }
     else
 #endif
-    if (setting.mode == M_GENLOW) {// if in low output mode and level sweep or frequency weep is active or at start of sweep
-        float ls=setting.level_sweep;                                           // calculate and set the output level
-        if (ls > 0)
-          ls += 0.5;
-        else if (ls < 0)
-          ls -= 0.5;
-        float a = ((int)((setting.level + ((float)i / sweep_points) * ls)*2.0)) / 2.0 /* + get_level_offset() */ ;
+    if (setting.mode == M_GENLOW) {  // Low output mode: calculate and set output level
+        // Calculate level sweep amount with rounding
+        float level_sweep_amount = setting.level_sweep;
+        if (level_sweep_amount > 0)
+          level_sweep_amount += 0.5;
+        else if (level_sweep_amount < 0)
+          level_sweep_amount -= 0.5;
+        
+        // Calculate target output level including sweep progression (rounded to 0.5 dB steps)
+        float target_output_level_dBm = ((int)((setting.level + ((float)i / sweep_points) * level_sweep_amount)*2.0)) / 2.0;
 #ifdef TINYSA4
-        set_output_path(f, a);
+        set_output_path(f, target_output_level_dBm);
 #else
-        int d;
+        int drive_index;
 #if 0
         if (force_signal_path) {
           setting.atten_step = test_output_switch;
-          d = test_output_drive;
+          drive_index = test_output_drive;
           setting.attenuate_x2 = test_output_attenuate;
           goto set_path;
         }
 #endif
+        // Apply frequency-dependent correction
         correct_RSSI_freq = get_frequency_correction(f);
-        a += PURE_TO_float(correct_RSSI_freq);
-        if (a != old_a) {
-          old_a = a;
-          a = a - level_max();                 // convert to all settings maximum power output equals a = zero
-          if (a < -SWITCH_ATTENUATION) {
-            a = a + SWITCH_ATTENUATION;
-            setting.atten_step = true;
+        target_output_level_dBm += PURE_TO_float(correct_RSSI_freq);
+        
+        // Only update hardware if level changed (avoids unnecessary register writes)
+        if (target_output_level_dBm != prev_output_level_dBm) {
+          prev_output_level_dBm = target_output_level_dBm;
+          
+          // Convert to relative level (0 = maximum power output)
+          float level_relative_to_max_dBm = target_output_level_dBm - level_max();
+          
+          // Determine if path switching is needed for large attenuation
+          if (level_relative_to_max_dBm < -SWITCH_ATTENUATION) {
+            level_relative_to_max_dBm += SWITCH_ATTENUATION;
+            setting.atten_step = true;   // Use attenuated signal path
           } else {
-            setting.atten_step = false;
+            setting.atten_step = false;  // Use direct signal path
           }
+          
 #define LOWEST_LEVEL MIN_DRIVE
-          d = MAX_DRIVE-3;        // Start in the middle
-          float blw =  BELOW_MAX_DRIVE(d);
-          while (a > blw && d < MAX_DRIVE) { // Increase if needed
-            d++;
-            blw =  BELOW_MAX_DRIVE(d);
+          // Search for optimal drive setting - start in middle range
+          drive_index = MAX_DRIVE-3;
+          float drive_offset_dBm = BELOW_MAX_DRIVE(drive_index);
+          
+          // Increase drive if current setting is too low
+          while (level_relative_to_max_dBm > drive_offset_dBm && drive_index < MAX_DRIVE) {
+            drive_index++;
+            drive_offset_dBm = BELOW_MAX_DRIVE(drive_index);
           }
-          while (a + 28 < blw && d > LOWEST_LEVEL) { // reduce till it fits attenuator (31 - 3)
-            d--;
-            blw =  BELOW_MAX_DRIVE(d);
+          
+          // Reduce drive while it still fits in attenuator range (31 - 3 = 28 dB)
+          while (level_relative_to_max_dBm + 28 < drive_offset_dBm && drive_index > LOWEST_LEVEL) {
+            drive_index--;
+            drive_offset_dBm = BELOW_MAX_DRIVE(drive_index);
           }
-          a -= blw;
-          if (a > 0)
-            a = 0;
-          if (a < -31.5)
-            a = -31.5;
-          a = -a - 0.25;        // Rounding
-          setting.attenuate_x2 = (int)(a * 2);
+          
+          // Calculate attenuator setting
+          float attenuator_level_dBm = level_relative_to_max_dBm - drive_offset_dBm;
+          if (attenuator_level_dBm > 0)
+            attenuator_level_dBm = 0;
+          if (attenuator_level_dBm < -31.5)
+            attenuator_level_dBm = -31.5;
+          attenuator_level_dBm = -attenuator_level_dBm - 0.25;  // Rounding
+          setting.attenuate_x2 = (int)(attenuator_level_dBm * 2);
+          
 //        set_path:
-          SI4432_Sel = SI4432_RX ;
-          SI4432_Drive(d);
-          SI4432_Sel = SI4432_RX ;
-          if ( setting.atten_step)
-            set_switch_receive();
+          // Apply settings to hardware
+          SI4432_Sel = SI4432_RX;
+          SI4432_Drive(drive_index);
+          SI4432_Sel = SI4432_RX;
+          if (setting.atten_step)
+            set_switch_receive();   // Attenuated path
           else
-            set_switch_transmit();
+            set_switch_transmit();  // Direct path
           PE4302_Write_Byte(setting.attenuate_x2);
 #if 0
           if (debug_level && SDU1.config->usbp->state == USB_ACTIVE)
-             shell_printf ("level=%f, d=%d, a=%d, s=%d\r\n", setting.level, d, setting.attenuate_x2, (setting.atten_step ? 1 : 0));
+             shell_printf ("level=%f, d=%d, a=%d, s=%d\r\n", setting.level, drive_index, setting.attenuate_x2, (setting.atten_step ? 1 : 0));
 #endif
         }
 #endif
     }
-    else if (setting.mode == M_GENHIGH) {
+    else if (setting.mode == M_GENHIGH) {  // High output mode: set output level
 #ifdef TINYSA4
       if (force_signal_path) {
         enable_rx_output(!test_output_switch);
@@ -3919,21 +3954,24 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       } else
 #endif
       {
-      float a = setting.level - level_max();
-      if (a <= -SWITCH_ATTENUATION) {
-        setting.atten_step = true;
-        a = a + SWITCH_ATTENUATION;
+      // Calculate level relative to maximum output power
+      float level_relative_to_max_dBm = setting.level - level_max();
+      
+      // Determine if path switching is needed for large attenuation
+      if (level_relative_to_max_dBm <= -SWITCH_ATTENUATION) {
+        setting.atten_step = true;  // Use attenuated signal path
+        level_relative_to_max_dBm += SWITCH_ATTENUATION;
 #ifdef TINYSA3
-        SI4432_Sel = SI4432_LO ;
+        SI4432_Sel = SI4432_LO;
         set_switch_receive();
 #else
         enable_ADF_output(true, false);
 ;
 #endif
       } else {
-        setting.atten_step = false;
+        setting.atten_step = false;  // Use direct signal path
 #ifdef TINYSA3
-        SI4432_Sel = SI4432_LO ;
+        SI4432_Sel = SI4432_LO;
         set_switch_transmit();
 #else
         enable_ADF_output(true, true);
@@ -3941,24 +3979,27 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
 #endif
       }
 
-      int d = MIN_DRIVE;
-      while (drive_dBm[d] - level_max() < a && d < MAX_DRIVE)       // Find level equal or above requested level
-        d++;
-      //    if (d == 8 && v < -12)  // Round towards closest level
-      //      d = 7;
-      setting.level = drive_dBm[d] + config.high_level_output_offset - (setting.atten_step ? SWITCH_ATTENUATION : 0);
+      // Find drive setting that meets or exceeds requested level
+      int drive_index = MIN_DRIVE;
+      while (drive_dBm[drive_index] - level_max() < level_relative_to_max_dBm && drive_index < MAX_DRIVE)
+        drive_index++;
+      //    if (drive_index == 8 && v < -12)  // Round towards closest level
+      //      drive_index = 7;
+      
+      // Update actual output level to closest achievable value
+      setting.level = drive_dBm[drive_index] + config.high_level_output_offset - (setting.atten_step ? SWITCH_ATTENUATION : 0);
 
 #ifdef __SI4432__
-        SI4432_Sel = SI4432_LO ;
-        SI4432_Drive(d);
+        SI4432_Sel = SI4432_LO;
+        SI4432_Drive(drive_index);
 #endif
 #ifdef TINYSA4
 #ifndef __NEW_SWITCHES__
         if (config.high_out_adf4350)
-          SI4463_set_output_level(d);
+          SI4463_set_output_level(drive_index);
         else
 #endif
- //         ADF4351_aux_drive(d);
+ //         ADF4351_aux_drive(drive_index);
 #endif
       }
     }
