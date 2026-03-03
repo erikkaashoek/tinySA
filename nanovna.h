@@ -168,7 +168,7 @@ extern char *hw_text;
 #define HIGH_MAX_FREQ_MHZ   1130
 #define MINIMUM_DIRECT_FREQ  823000000ULL
 #define ULTRA_AUTO         10000000000ULL // 10GHz
-
+#define MAX_CTCSS_FREQ  255
 
 //#define LOW_MAX_FREQ         800000000ULL
 //#define MIN_BELOW_LO         550000000ULL   // not used????

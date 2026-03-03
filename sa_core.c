@@ -3542,9 +3542,9 @@ static const int fm_modulation[MODULATION_TABLES][MAX_MODULATION_STEPS] =
 #ifdef TINYSA3
 static const int fm_modulation_offset[4] =
 {
-   85000,
+   83125,   // 80000 + 2*LND*156.25  (LND=10, low band step = 156.25 Hz)
    80000,
-  165000,
+  163750,   // 160000 + 2*HND*312.5  (HND=6,  high band step = 312.5 Hz)
   160000
 };
 #endif
@@ -3752,9 +3752,12 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
           modulation_steps >>= 1;
         }
         if (modulation_steps >= 4) {
-          int hn = (config.wfm_1khz_harmonic > 0 && setting.modulation_frequency < 250.0) ? (int)((1000.0 / setting.modulation_frequency) + 0.5) : 0;
+          int hn = (config.wfm_1khz_harmonic > 0 && setting.modulation_frequency < MAX_CTCSS_FREQ) ? (int)((1000.0 / setting.modulation_frequency) + 0.5) : 0;
+          int local_deviation = setting.modulation_deviation_div100;
+          if (hn)
+            local_deviation /= 7;                   // 15% CTCSS deviation
           for (int i = 0; i < modulation_steps/4+1; i++) {
-            fm_modulation[i] = setting.modulation_deviation_div100 * sine_wave[i*sine_wave_index]/100;
+            fm_modulation[i] = local_deviation * sine_wave[i*sine_wave_index]/100;
             fm_modulation[modulation_steps/2 - i] = fm_modulation[i];
             fm_modulation[modulation_steps/2 + i] = -fm_modulation[i];
             fm_modulation[modulation_steps - i] = -fm_modulation[i];

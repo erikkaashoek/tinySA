@@ -2512,9 +2512,11 @@ static UI_FUNCTION_ADV_CALLBACK(menu_audible_harmonic)
   (void)item;
   (void)data;
   if (b){
-    b->icon = config.wfm_1khz_harmonic ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    b->icon = (config.wfm_1khz_harmonic && setting.modulation_frequency < MAX_CTCSS_FREQ) ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
     return;
   }
+  if (setting.modulation_frequency >= MAX_CTCSS_FREQ)
+    return;
   config.wfm_1khz_harmonic = config.wfm_1khz_harmonic ? 0 : 100;  // Toggle between off and 100%
   dirty = true;
 //  menu_move_back(false);
@@ -4472,7 +4474,7 @@ static const menuitem_t  menu_modulation[] = {
   { MT_FORM | MT_KEYPAD,   KM_MODULATION,           "FREQ: %s",         "1Hz..3.5kHz"},
   { MT_FORM | MT_KEYPAD,   KM_DEPTH,               "AM DEPTH: %s%%",         "0..100"},
   { MT_FORM | MT_KEYPAD,   KM_DEVIATION,            "FM DEVIATION: %s",         "1kHz..300kHz"},
-  { MT_FORM | MT_ADV_CALLBACK, 0,                   "Add Audible harmonic", menu_audible_harmonic},
+  { MT_FORM | MT_ADV_CALLBACK, 0,                   "CTCSS + 1 kHz", menu_audible_harmonic},
 //  { MT_FORM | MT_ADV_CALLBACK, MO_NFM2,              MT_CUSTOM_LABEL,    menu_modulation_acb},
 //  { MT_FORM | MT_ADV_CALLBACK, MO_NFM3,              MT_CUSTOM_LABEL,    menu_modulation_acb},
 #else
