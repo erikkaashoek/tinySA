@@ -1680,7 +1680,11 @@ static void cell_draw_marker_info(int x0, int y0)
       ypos = 14 - y0;
       if (setting.measurement==M_CP ) {
         float v = 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]);
-        cell_printf(xpos, ypos, FONT_b"%4.1f%%", v );
+        if (c == 1)
+          cell_printf(xpos, ypos, FONT_b"%4.1f%%", v );
+        else
+          cell_printf(xpos, ypos, FONT_b"%4.1f%% %4.1fdBc", v, channel_power[c] - channel_power[1] );
+
 #ifdef __LEVEL_METER__
         if (c == 1)
            plot_printf(level_text, sizeof(level_text), "%4.1f%%", v);

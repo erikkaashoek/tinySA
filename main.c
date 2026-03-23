@@ -1916,6 +1916,28 @@ VNA_SHELL_FUNCTION(cmd_recall)
   shell_printf("recall {id}\r\n");
 }
 
+VNA_SHELL_FUNCTION(cmd_channel)
+{
+  if (argc == 0) {
+    for (int c=0;c<3;c++){
+      shell_printf("channel[%d] : %4.1f\r\n", c+1, channel_power[c]);
+    }
+    return;
+  }
+  if (argc != 1)
+    goto usage;
+  if (argv[0][0] == '?')
+    goto usage;
+  int id = my_atoi(argv[0]);
+  if (id < 1 || id > 3)
+    goto usage;
+  id -= 1;
+  shell_printf("%4.1f\r\n",channel_power[id]);
+  return;
+ usage:
+  shell_printf("channel [1-3]\r\n");
+}
+
 const char * const trc_channel_name[TRACES_MAX] = {
   [TRACE_ACTUAL] = "MEASURED",
   [TRACE_STORED] = "STORED",
@@ -2152,6 +2174,8 @@ VNA_SHELL_FUNCTION(cmd_marker)
 usage:
   shell_printf("marker [n] [%s|{freq}|{index}] [{n}|%s]\r\n", cmd_marker_list, cmd_marker_on_off);
 }
+
+
 
 VNA_SHELL_FUNCTION(cmd_touchcal)
 {
@@ -2492,6 +2516,7 @@ static const VNAShellCommand commands[] =
     {"trace"       , cmd_trace       , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
     {"trigger"     , cmd_trigger     , CMD_RUN_IN_LOAD},
     {"marker"      , cmd_marker      , CMD_RUN_IN_LOAD},
+    {"channel"     , cmd_channel     , CMD_WAIT_MUTEX },
 #ifdef __DRAW_LINE__
     {"line"        , cmd_line        , CMD_RUN_IN_LOAD},
 #endif
