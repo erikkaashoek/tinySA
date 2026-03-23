@@ -966,13 +966,69 @@ VNA_SHELL_FUNCTION(cmd_remark)
 #ifdef __REMOTE_DESKTOP__
 uint8_t remote_mouse_down = false;
 uint8_t auto_capture = false;
+uint8_t rle   = false;
+
+// RLE-encode a pixel buffer and send it over the USB shell stream.
+// buf   : pixel_t array in tinySA wire format (byte-swapped RGB565)
+// count : number of pixels
+// Used for bulk region updates (PROTOCOL.md §6.2 / §7).  No RLE terminator
+// is appended: the host reads exactly W*H decoded pixels by count.
+//
+// out[32] layout:  up to 29 run-code words, then 1 last-run word + 2 words
+// for the "ch> " prompt = 32 total.  Only ONE streamWrite at the final flush
+// avoids USB CDC packet ordering issues that arise from multiple writes.
+void do_send_rle(const uint16_t *buf, int count)
+{
+  uint16_t out[32];
+  int outidx = 0;
+  uint16_t cur = 0;
+  int run = 0;
+
+  while (count-- > 0) {
+    uint16_t p = (*buf++) & RLE_COLOR_MASK;
+    if (run == 0 || (cur & RLE_COLOR_MASK) != p || run >= 128) {
+      if (run > 0) {
+        out[outidx++] = cur;
+        if (outidx >= 29) {   // flush; keep 3 slots: last-run + 2x "ch> "
+          streamWrite(shell_stream, (void*)out, (uint16_t)(outidx * 2));
+          //osalThreadSleepMilliseconds(10);
+          outidx = 0;
+        }
+      }
+      cur = p;               // repeat_count = 0 → pixel delivered once
+      run = 1;
+    } else {
+      cur = p | RLE_ENCODE_COUNT(run);
+      run++;
+    }
+  }
+  // Append last run + "ch> " into the same buffer; one send, zero extra packets
+  if (run > 0)
+    out[outidx++] = cur;
+  out[outidx++] = (uint16_t)('c' | ('h' << 8));   // bytes: 'c', 'h'
+  out[outidx++] = (uint16_t)('>' | (' ' << 8));   // bytes: '>',  ' '
+  streamWrite(shell_stream, (void*)out, (uint16_t)(outidx * 2));
+  //osalThreadSleepMilliseconds(10);
+}
 
 void send_region(remote_region_t *rd, uint8_t * buf, uint16_t size)
 {
   if (SDU1.config->usbp->state == USB_ACTIVE) {
-    streamWrite(shell_stream, (void*) rd, sizeof(remote_region_t));
-    streamWrite(shell_stream, (void*) buf, size);
-    streamWrite(shell_stream, (void*)"ch> ", 4);
+    // Write tag and coordinates as two explicit writes to avoid any
+    // struct-layout / sizeof ambiguity (same pattern as cmd_capt).
+    const int16_t dims[4] = {rd->x, rd->y, rd->w, rd->h};
+    streamWrite(shell_stream, (void*) rd->new_str, 6);
+//    osalThreadSleepMilliseconds(1);
+    streamWrite(shell_stream, (void*) dims, 8);
+//    osalThreadSleepMilliseconds(1);
+    if (rle && size > 2) {                // bulk pixels -> RLE encode
+      do_send_rle((const uint16_t *)buf, size >> 1);
+    } else {                                      // fill/flip or raw-pixel mode
+      streamWrite(shell_stream, (void*) buf, size);
+//      osalThreadSleepMilliseconds(1);
+      streamWrite(shell_stream, (void*)"ch> ", 4);
+//      osalThreadSleepMilliseconds(1);
+    }
   }
   else
     auto_capture = false;
@@ -980,12 +1036,20 @@ void send_region(remote_region_t *rd, uint8_t * buf, uint16_t size)
 
 VNA_SHELL_FUNCTION(cmd_refresh)
 {
-// read pixel count at one time (PART*2 bytes required for read buffer)
-  int m = generic_option_cmd("refresh", "off|on", argc, argv[0]);
-  if (m>=0) {
-    auto_capture = m;
-  }
+  int m = generic_option_cmd("refresh", "off|on|rle", argc, argv[0]);
+  if (m == 0) { auto_capture = false; rle = false; }
+  else if (m == 1) { auto_capture = true;  rle = false; }
+  else if (m == 2) { auto_capture = true;  rle = true;  }
 }
+
+VNA_SHELL_FUNCTION(cmd_rle)
+{
+  int m = generic_option_cmd("rle", "off|on", argc, argv[0]);
+  if (m == 0) { rle = false; }
+  else if (m == 1) { rle = true; }
+}
+
+
 VNA_SHELL_FUNCTION(cmd_touch)
 {
   if (argc != 2) return;
@@ -1025,6 +1089,71 @@ VNA_SHELL_FUNCTION(cmd_capture)
     uint8_t *buf = (uint8_t *)spi_buffer;
     ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
     streamWrite(shell_stream, (void*)buf, 2 * LCD_WIDTH * sizeof(uint16_t));
+  }
+}
+
+// RLE-encoded screen capture. Sends a "bulk\r\n" + x,y,w,h header (14 bytes)
+// using two explicit writes to avoid struct-layout ambiguity, then RLE encodes
+// the full screen in 2-row chunks reusing spi_buffer (no extra RAM).  RLE state
+// is kept across row boundaries so runs are never split artificially.
+// "ch> " prompt is left to the shell on return.
+VNA_SHELL_FUNCTION(cmd_capt)
+{
+  (void)argc;
+  (void)argv;
+#ifdef TINYSA4
+#if SPI_BUFFER_SIZE < (2*LCD_WIDTH)
+#error "Low size of spi_buffer for cmd_capt"
+#endif
+#else
+#if SPI_BUFFER_SIZE < (3*LCD_WIDTH + 1)
+#error "Low size of spi_buffer for cmd_capt"
+#endif
+#endif
+#if 0
+  // Send "bulk\r\n" header (6 bytes) then x,y,w,h (8 bytes) explicitly
+  // to avoid any compiler struct-layout ambiguity.
+  static const char capt_tag[] = "bulk\r\n";
+  const int16_t capt_dims[4] = {0, 0, LCD_WIDTH, LCD_HEIGHT};
+  streamWrite(shell_stream, (void*)capt_tag, 6);
+  osalThreadSleepMilliseconds(1);
+  streamWrite(shell_stream, (void*)capt_dims, 8);
+  osalThreadSleepMilliseconds(1);
+#endif
+  uint16_t out[32];
+  int      outidx = 0;
+  uint16_t cur    = 0;
+  int      run    = 0;
+  int y;
+  for (y = 0; y < LCD_HEIGHT; y += 2) {
+    ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
+    const uint16_t *px = (const uint16_t *)spi_buffer;
+    int n = 2 * LCD_WIDTH;
+    while (n-- > 0) {
+      uint16_t p = (*px++) & RLE_COLOR_MASK;
+      if (run == 0 || (cur & RLE_COLOR_MASK) != p || run >= 128) {
+        if (run > 0) {
+          out[outidx++] = cur;
+          if (outidx >= 29) {
+            streamWrite(shell_stream, (void*)out, (uint16_t)(outidx * 2));
+            osalThreadSleepMilliseconds(1);
+            outidx = 0;
+          }
+        }
+        cur = p;
+        run = 1;
+      } else {
+        cur = p | RLE_ENCODE_COUNT(run);
+        run++;
+      }
+    }
+  }
+  // flush last run; shell appends "ch> " prompt automatically after return
+  if (run > 0)
+    out[outidx++] = cur;
+  if (outidx > 0) {
+    streamWrite(shell_stream, (void*)out, (uint16_t)(outidx * 2));
+    osalThreadSleepMilliseconds(1);
   }
 }
 
@@ -2489,8 +2618,10 @@ static const VNAShellCommand commands[] =
     {"usart_cfg"   , cmd_usart_cfg   , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
 #endif
     {"capture"     , cmd_capture     , CMD_WAIT_MUTEX | CMD_RUN_IN_UI},
+    {"capt"        , cmd_capt        , CMD_WAIT_MUTEX | CMD_RUN_IN_UI},
 #ifdef __REMOTE_DESKTOP__
     {"refresh"     , cmd_refresh     , 0},
+    {"rle"         , cmd_rle         , 0},
     {"touch"       , cmd_touch       , 0},
     {"release"     , cmd_release     , 0},
 #endif

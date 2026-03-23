@@ -296,6 +296,17 @@ const char *get_hw_version_text(void);
 #ifdef __REMOTE_DESKTOP__
 extern uint8_t remote_mouse_down;
 extern uint8_t auto_capture;
+extern uint8_t rle_capture;       // When set, bulk pixel data is RLE-encoded
+// RLE pixel encoding (PROTOCOL.md §7):
+//   16-bit wire word (transmitted LE): colour bits in 0x1ce7, count bits in 0xe318
+//   repeat_count 0 = pixel appears once, 127 = appears 128 times
+#define RLE_COLOR_MASK    0x1ce7u
+#define RLE_REPEAT_MASK   0xe318u
+#define RLE_RUN_END       0x4000u
+#define RLE_ENCODE_COUNT(n) ( (((uint16_t)(n) << 9) & 0xe000u) \
+                            | (((uint16_t)(n) << 6) & 0x0300u) \
+                            | (((uint16_t)(n) << 3) & 0x0018u) )
+void do_send_rle(const uint16_t *buf, int count);
 typedef struct {
   char new_str[6];
   int16_t x;
@@ -1100,14 +1111,14 @@ typedef uint16_t pixel_t;
 [LCD_BG_COLOR         ] = RGB565(  0,  0,  0), \
 [LCD_FG_COLOR         ] = RGB565(255,255,255), \
 [LCD_GRID_COLOR       ] = RGB565(128,128,128), \
-[LCD_MENU_COLOR       ] = RGB565(230,230,230), \
+[LCD_MENU_COLOR       ] = RGB565(224,224,224), \
 [LCD_MENU_TEXT_COLOR  ] = RGB565(  0,  0,  0), \
-[LCD_MENU_ACTIVE_COLOR] = RGB565(210,210,210), \
+[LCD_MENU_ACTIVE_COLOR] = RGB565(192,192,192), \
 [LCD_TRACE_1_COLOR    ] = RGB565(255,255,  0), \
 [LCD_TRACE_2_COLOR    ] = RGB565( 64,255, 64), \
 [LCD_TRACE_3_COLOR    ] = RGB565(255, 64, 64), \
 [LCD_TRACE_4_COLOR    ] = RGB565(255,  0,255), \
-[LCD_NORMAL_BAT_COLOR ] = RGB565( 31,227,  0), \
+[LCD_NORMAL_BAT_COLOR ] = RGB565( 32,224,  0), \
 [LCD_LOW_BAT_COLOR    ] = RGB565(255,  0,  0), \
 [LCD_TRIGGER_COLOR    ] = RGB565(  0,  0,255), \
 [LCD_RISE_EDGE_COLOR  ] = RGB565(255,255,255), \
@@ -1119,10 +1130,10 @@ typedef uint16_t pixel_t;
 [LCD_BRIGHT_COLOR_BLUE] = RGB565(  0,  0,255), \
 [LCD_BRIGHT_COLOR_RED ] = RGB565(255,128,128), \
 [LCD_BRIGHT_COLOR_GREEN]= RGB565(  0,255,  0), \
-[LCD_DARK_GREY        ] = RGB565(140,140,140), \
-[LCD_LIGHT_GREY       ] = RGB565(220,220,220), \
-[LCD_HAM_COLOR        ] = RGB565( 80, 80, 80), \
-[LCD_GRID_VALUE_COLOR ] = RGB565(196,196,196), \
+[LCD_DARK_GREY        ] = RGB565(160,160,160), \
+[LCD_LIGHT_GREY       ] = RGB565(224,224,224), \
+[LCD_HAM_COLOR        ] = RGB565( 96, 96, 96), \
+[LCD_GRID_VALUE_COLOR ] = RGB565(192,192,192), \
 [LCD_M_REFERENCE      ] = RGB565(255,255,255), \
 [LCD_M_DELTA          ] = RGB565(  0,255,  0), \
 [LCD_M_NOISE          ] = RGB565(  0,255,255), \
@@ -1133,14 +1144,14 @@ typedef uint16_t pixel_t;
 [LCD_BG_COLOR         ] = RGB565(  0,  0,  0), \
 [LCD_FG_COLOR         ] = RGB565(255,255,255), \
 [LCD_GRID_COLOR       ] = RGB565(128,128,128), \
-[LCD_MENU_COLOR       ] = RGB565(230,230,230), \
+[LCD_MENU_COLOR       ] = RGB565(224,224,224), \
 [LCD_MENU_TEXT_COLOR  ] = RGB565(  0,  0,  0), \
-[LCD_MENU_ACTIVE_COLOR] = RGB565(210,210,210), \
+[LCD_MENU_ACTIVE_COLOR] = RGB565(192,192,192), \
 [LCD_TRACE_1_COLOR    ] = RGB565(255,255,  0), \
 [LCD_TRACE_2_COLOR    ] = RGB565( 64,255, 64), \
 [LCD_TRACE_3_COLOR    ] = RGB565(255,  0,255), \
 [LCD_TRACE_4_COLOR    ] = RGB565(255, 64, 64), \
-[LCD_NORMAL_BAT_COLOR ] = RGB565( 31,227,  0), \
+[LCD_NORMAL_BAT_COLOR ] = RGB565( 32,224,  0), \
 [LCD_LOW_BAT_COLOR    ] = RGB565(255,  0,  0), \
 [LCD_TRIGGER_COLOR    ] = RGB565(  0,  0,255), \
 [LCD_RISE_EDGE_COLOR  ] = RGB565(255,255,255), \
@@ -1152,10 +1163,10 @@ typedef uint16_t pixel_t;
 [LCD_BRIGHT_COLOR_BLUE] = RGB565(  0,  0,255), \
 [LCD_BRIGHT_COLOR_RED ] = RGB565(255,128,128), \
 [LCD_BRIGHT_COLOR_GREEN]= RGB565(  0,255,  0), \
-[LCD_DARK_GREY        ] = RGB565(140,140,140), \
-[LCD_LIGHT_GREY       ] = RGB565(220,220,220), \
-[LCD_HAM_COLOR        ] = RGB565( 40, 40, 40), \
-[LCD_GRID_VALUE_COLOR ] = RGB565(196,196,196), \
+[LCD_DARK_GREY        ] = RGB565(160,160,160), \
+[LCD_LIGHT_GREY       ] = RGB565(224,224,224), \
+[LCD_HAM_COLOR        ] = RGB565( 32, 32, 32), \
+[LCD_GRID_VALUE_COLOR ] = RGB565(192,192,192), \
 [LCD_M_REFERENCE      ] = RGB565(255,255,255), \
 [LCD_M_DELTA          ] = RGB565(  0,255,  0), \
 [LCD_M_NOISE          ] = RGB565(  0,255,255), \
