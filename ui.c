@@ -6672,9 +6672,11 @@ static const menuitem_t *menu_next_item(const menuitem_t *m, int *sub_item){
 }
 
 static const menuitem_t *current_menu_item(int i, int *sub_item){
+  if (i < 0)
+    return NULL;
   *sub_item = 0;
   const menuitem_t * m = menu_stack[menu_current_level];
-  while (i--) m = menu_next_item(m,sub_item);
+  while (i-- && m != NULL) m = menu_next_item(m,sub_item);
   return m;
 }
 

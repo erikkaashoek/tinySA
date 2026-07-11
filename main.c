@@ -2037,15 +2037,23 @@ show_one:
   static const char cmd_load_list[] = "copy|freeze|subtract|view|value";
   if (argc >= 2) {
     switch (get_str_index(argv[next_arg++], cmd_load_list)) {
-    case 0:
-      store_trace(t, my_atoi(argv[next_arg++])-1); // copy {trace}
+    case 0: {
+      int destination = my_atoi(argv[next_arg++])-1; // copy {trace}
+      if ((uint32_t)destination >= TRACES_MAX)
+        goto usage;
+      store_trace(t, destination);
       goto update;
+      }
     case 1:
       setting.stored[t]= (get_str_index(argv[next_arg++], "off|on") == 1); // freeze {off|on}
       goto update;
-    case 2:
-      subtract_trace(t,my_atoi(argv[next_arg++])-1);
+    case 2: {
+      int source = my_atoi(argv[next_arg++])-1;
+      if ((uint32_t)source >= TRACES_MAX)
+        goto usage;
+      subtract_trace(t, source);
       goto update;
+      }
     case 3:
       if (get_str_index(argv[next_arg++], "off|on") == 1)
         { TRACE_ENABLE(1<<t); }
@@ -2054,8 +2062,10 @@ show_one:
       goto update;
     case 4:
       {
+      if (argc != 3)
+        goto usage;
       int i = my_atoi(argv[next_arg++]);
-      if (i>= sweep_points)
+      if ((uint32_t)i >= sweep_points)
         goto usage;
       float v = my_atof(argv[next_arg]);
       measured[t][i] = v;
@@ -2134,8 +2144,12 @@ VNA_SHELL_FUNCTION(cmd_marker)
       //      M_NORMAL=0,M_REFERENCE=1, M_DELTA=2, M_NOISE=4, M_STORED=8, M_AVER=16, M_TRACKING=32, M_DELETE=64  // Tracking must be last.
     case 3:
       tr=0;
-      if (argc == 3 && argv[2][0] >= '1' && argv[2][0] <= '9') {
+      if (argc != 3)
+        goto usage;
+      if (argv[2][0] >= '1' && argv[2][0] <= '9') {
         tr = my_atoui(argv[2])-1;
+        if ((uint32_t)tr >= MARKERS_MAX)
+          goto usage;
         markers[t].mtype |= M_DELTA;
         markers[t].ref= tr;
       } else if (get_str_index(argv[2],cmd_marker_on_off) == 0) {
@@ -2149,10 +2163,11 @@ VNA_SHELL_FUNCTION(cmd_marker)
       marker_mask = M_TRACKING;
       goto set_mask;
     case 6:
-      tr=0;
-      if (argc == 3 && argv[2][0] >= '1' && argv[2][0] <= '9') {
-        tr = my_atoui(argv[2])-1;
-      }
+      if (argc != 3 || argv[2][0] < '1' || argv[2][0] > '9')
+        goto usage;
+      tr = my_atoui(argv[2])-1;
+      if ((uint32_t)tr >= TRACES_MAX)
+        goto usage;
       markers[t].trace= tr;
       return;
     case 7:
@@ -2380,7 +2395,7 @@ VNA_SHELL_FUNCTION(cmd_color)
     return;
   }
   i = my_atoi(argv[0]);
-  if (i >= MAX_PALETTE)
+  if (i < 0 || i >= MAX_PALETTE)
     return;
   color = RGBHEX(my_atoui(argv[1]));
   config.lcd_palette[i] = color;
