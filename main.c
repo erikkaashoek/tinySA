@@ -2285,14 +2285,14 @@ typedef struct version_t {
   const char *hw_text;
 } version_t;
 
-#define MAX_VERSION_TEXT    5
-const version_t hw_version_text[MAX_VERSION_TEXT] =
+const version_t hw_version_text[] =
 {
  { 165, 179,    "V0.4.5.1",     1,      0, " ZS405"},
  { 180, 195,    "V0.4.5.1.1",   2,      0, " ZS405"},
  { 250, 350,    "V0.4.6",       3,      1, "+ ZS406"},
  { 2200, 2299,  "V0.5.4",       103,    1, "+ ZS407"},
 };
+#define MAX_VERSION_TEXT    (sizeof(hw_version_text) / sizeof(hw_version_text[0]))
 
 uint16_t hwid = 0;
 uint16_t hw_if = 0;
@@ -2307,7 +2307,7 @@ const char *get_hw_version_text(void)
     chThdSleepMilliseconds(1);
     v = adc1_single_read(0);
   }
-  for (int i=0; i<MAX_VERSION_TEXT;i++) {
+  for (size_t i=0; i<MAX_VERSION_TEXT;i++) {
     if (hw_version_text[i].min_adc <= v && v <= hw_version_text[i].max_adc) {
       hwid = hw_version_text[i].hwid;
       hw_if = hw_version_text[i].hw_if;
