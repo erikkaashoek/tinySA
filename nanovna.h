@@ -1593,6 +1593,7 @@ extern const char * const averageText[];
 extern uint8_t menu_current_level;
 void menu_invoke(int item);
 extern char    kp_buf[];
+void ui_set_keypad_text(const char *text);
 void set_numeric_value(void);
 
 void ui_mode_normal(void);

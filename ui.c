@@ -96,6 +96,12 @@ char    kp_buf[NUMINPUT_LEN+2];  // !!!!!! WARNING size must be + 2 from NUMINPU
 #else
 char    kp_buf[TXTINPUT_LEN+1];  // !!!!!! WARNING size must be + 2 from NUMINPUT_LEN or TXTINPUT_LEN + 1
 #endif
+
+void ui_set_keypad_text(const char *text)
+{
+  plot_printf(kp_buf, sizeof(kp_buf), "%s", text);
+}
+
 static uint8_t ui_mode = UI_NORMAL;
 static uint8_t keypad_mode;
 static char   *kp_help_text = NULL;

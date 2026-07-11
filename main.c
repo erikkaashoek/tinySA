@@ -956,12 +956,7 @@ VNA_SHELL_FUNCTION(cmd_text)
 {
   if (argc!= 1)
     return;
-  char *p = argv[0];
-  char *t = kp_buf;
-  while (*p) {
-    *t++ = *p++;
-  }
-  *t = 0;
+  ui_set_keypad_text(argv[0]);
   uistat.value = my_atof(kp_buf);
   uistat.freq_value = my_atoui(kp_buf);
   set_numeric_value();
