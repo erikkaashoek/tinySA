@@ -1219,7 +1219,6 @@ VNA_SHELL_FUNCTION(cmd_f)
 
 VNA_SHELL_FUNCTION(cmd_correction)
 {
-  (void)argc;
 #ifdef TINYSA4
   static const char cmd[] = "low|lna|ultra|ultra_lna|direct|direct_lna|harm|harm_lna|out|out_direct|out_adf|out_ultra|off|on";
   static const char range[] = "0-19";
@@ -1227,6 +1226,8 @@ VNA_SHELL_FUNCTION(cmd_correction)
   static const char cmd[] = "low|high|out";
   static const char range[] = "0-9";
 #endif
+  if (argc < 1)
+    goto usage;
   int m = get_str_index(argv[0], cmd);
   if (argc == 1 && m >=0) {
 #ifdef TINYSA4
@@ -1248,6 +1249,8 @@ VNA_SHELL_FUNCTION(cmd_correction)
     }
     return;
   }
+  if (m < 0 || m >= CORRECTION_SIZE)
+    goto usage;
   if (argc == 2 && (get_str_index(argv[1],"reset") == 0)) {
     for (int i=0; i<CORRECTION_POINTS; i++) {
       config.correction_value[m][i] = 0.0;
@@ -1256,11 +1259,11 @@ VNA_SHELL_FUNCTION(cmd_correction)
     shell_printf("correction table %s reset\r\n", argv[0]);
     return;
   }
-  if (argc != 4) {
-    usage_printf("correction %s %s frequency(Hz) value(dB)\r\n", cmd, range);
-    return;
-  }
+  if (argc != 4)
+    goto usage;
   int i = my_atoi(argv[1]);
+  if ((uint32_t)i >= CORRECTION_POINTS)
+    goto usage;
   freq_t f = my_atoui(argv[2]);
   float v = my_atof(argv[3]);
   config.correction_frequency[m][i] = f;
@@ -1268,6 +1271,9 @@ VNA_SHELL_FUNCTION(cmd_correction)
   dirty = true;       // recalculate intermediate table
   redraw_request|=REDRAW_AREA;                  // to ensure the change in level will be visible
   shell_printf("updated %d to %D %.1f\r\n", i, config.correction_frequency[m][i], config.correction_value[m][i]);
+  return;
+usage:
+  usage_printf("correction %s %s frequency(Hz) value(dB)\r\n", cmd, range);
 }
 
 VNA_SHELL_FUNCTION(cmd_abort)
