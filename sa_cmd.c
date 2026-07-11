@@ -971,7 +971,12 @@ VNA_SHELL_FUNCTION(cmd_s)
     shell_printf("s=%d\r\n", points);
     return;
   }
-  points = my_atoi(argv[0]);
+  long_t requested_points = my_atoi(argv[0]);
+  if (requested_points < 2 || requested_points > INT32_MAX) {
+    shell_printf("sweep point count is invalid\r\n");
+    return;
+  }
+  points = (int)requested_points;
 }
 
 
@@ -1299,7 +1304,12 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
       return;
   }
   if (argc > 2) {
-    points = my_atoi(argv[2]);
+    long_t requested_points = my_atoi(argv[2]);
+    if (requested_points <= 0 || (uint64_t)requested_points > UINT32_MAX) {
+      shell_printf("scan point count is invalid\r\n");
+      return;
+    }
+    points = (uint32_t)requested_points;
   }
 
   if (argc > 3) {

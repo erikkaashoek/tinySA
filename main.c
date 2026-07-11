@@ -1432,7 +1432,7 @@ VNA_SHELL_FUNCTION(cmd_scan)
   }
   if (argc >= 3) {
     int points = my_atoi(argv[2]);
-    if (points <= 0 || points > POINTS_COUNT) {
+    if (points < 2 || points > POINTS_COUNT) {
       shell_printf("sweep points exceeds range "define_to_STR(POINTS_COUNT)"\r\n");
       return;
     }
