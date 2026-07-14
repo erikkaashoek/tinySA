@@ -231,7 +231,7 @@ static char *etoa(char *p, float num, uint32_t precision) {
   int exp = 0;
   if (num == 0) { *p++ = '0'; return p; }
   while (num < 10) { num *= 10.0; exp--; }
-  while (num > 10) { num /= 10.0; exp++; }
+  while (num >= 10) { num /= 10.0; exp++; }
   *p++ = ((int)num) + '0'; num *=10.0;
   *p++ = '.';
   if (precision == 0) precision = 6;
