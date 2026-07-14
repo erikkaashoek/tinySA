@@ -5301,33 +5301,37 @@ static bool sweep(bool break_on_operation)
         }
       }
     }
-    systime_t local_sweep_time = sa_ST2US(chVTGetSystemTimeX() - start_of_sweep_timestamp);
-    if (setting.actual_sweep_time_us > ONE_SECOND_TIME)
-      local_sweep_time = setting.actual_sweep_time_us;
     if (
 #ifdef TINYSA4
           progress_bar &&
 #endif
-          show_bar && (( local_sweep_time > ONE_SECOND_TIME && (i & 0x07) == 0) /* || ( local_sweep_time > ONE_SECOND_TIME*10)*/ ) )
+          show_bar && (i & 0x07) == 0)
     {
-      int pos = i * (WIDTH+1) / sweep_points;
-      ili9341_set_background(LCD_SWEEP_LINE_COLOR);
-      ili9341_fill(OFFSETX, CHART_BOTTOM+1, pos, 1);     // update sweep progress bar
-      ili9341_set_background(LCD_BG_COLOR);
-      ili9341_fill(OFFSETX+pos, CHART_BOTTOM+1, WIDTH-pos, 1);
+      // The progress bar is only updated every eighth point. Avoid reading and
+      // converting the system timer on the other seven points of fast sweeps.
+      systime_t local_sweep_time = sa_ST2US(chVTGetSystemTimeX() - start_of_sweep_timestamp);
+      if (setting.actual_sweep_time_us > ONE_SECOND_TIME)
+        local_sweep_time = setting.actual_sweep_time_us;
+      if (local_sweep_time > ONE_SECOND_TIME) {
+        int pos = i * (WIDTH+1) / sweep_points;
+        ili9341_set_background(LCD_SWEEP_LINE_COLOR);
+        ili9341_fill(OFFSETX, CHART_BOTTOM+1, pos, 1);     // update sweep progress bar
+        ili9341_set_background(LCD_BG_COLOR);
+        ili9341_fill(OFFSETX+pos, CHART_BOTTOM+1, WIDTH-pos, 1);
 
-      if (local_sweep_time > 10 * ONE_SECOND_TIME) {
-        plot_into_index(measured);
-        redraw_request |= REDRAW_CELLS | REDRAW_BATTERY | REDRAW_INBETWEEN;
-        // plot trace and other indications as raster
-        draw_all(true);  // flush markmap only if scan completed to prevent
-      }
+        if (local_sweep_time > 10 * ONE_SECOND_TIME) {
+          plot_into_index(measured);
+          redraw_request |= REDRAW_CELLS | REDRAW_BATTERY | REDRAW_INBETWEEN;
+          // plot trace and other indications as raster
+          draw_all(true);  // flush markmap only if scan completed to prevent
+        }
 
 
 #ifdef __SWEEP_RESTART__
-      if (MODE_OUTPUT(setting.mode) && (setting.level_sweep != 0 || get_sweep_frequency(ST_SPAN) != 0))
-        refresh_sweep_menu(i);
+        if (MODE_OUTPUT(setting.mode) && (setting.level_sweep != 0 || get_sweep_frequency(ST_SPAN) != 0))
+          refresh_sweep_menu(i);
 #endif
+      }
     }
     // -----------------------  debug avoid --------------------------------
     if (debug_avoid) {
