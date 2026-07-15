@@ -161,7 +161,8 @@ static THD_FUNCTION(Thread1, arg)
   while (1) {
 //  START_PROFILE
     if (sweep_mode&(SWEEP_ENABLE|SWEEP_ONCE)) {
-      backup_t b;
+      /* Initialize the reserved byte covered by the checksum too. */
+      backup_t b = {0};
       b.data.frequency0 = setting.frequency0;
       b.data.frequency1 = setting.frequency1;
       if (setting.auto_attenuation)
