@@ -110,19 +110,24 @@ float2int(float v)
 }
 #endif
 
-void update_grid(void)
+static void calculate_grid(int16_t *offset, int16_t *width, freq_t *span)
 {
   freq_t gdigit = 1000000000;
   freq_t fstart = get_sweep_frequency(ST_START) + (setting.frequency_offset - FREQUENCY_SHIFT);
   freq_t fspan  = get_sweep_frequency(ST_SPAN);
   freq_t grid;
+  bool time_domain = fspan == 0;
 
-  if (fspan == 0) {
+  if (time_domain) {
     fspan = setting.actual_sweep_time_us; // Time in uS
     fstart = 0;
   }
+  if (fspan == 0)
+    fspan = 1;
   if (config.gridlines == 0) {
     grid = fspan/10;
+    if (grid == 0)
+      grid = 1;
   } else {
   if (config.gridlines < 3)
     config.gridlines = 6;
@@ -139,19 +144,52 @@ void update_grid(void)
     gdigit /= 10;
   }
   }
-  grid_span = grid;
-  if (grid > 1000) {
-    grid_offset = (WIDTH) * ((fstart % grid) / 100) / (fspan / 100);
-    grid_width = (WIDTH) * (grid / 100) / (fspan / 1000);
+  *span = grid;
+  if (time_domain) {
+    // The zero-span x axis is measured in microseconds. Keep the full ratio
+    // until the final division so 5-20 ms sweeps do not shift by whole pixels.
+    *offset = (int16_t)((uint64_t)WIDTH * (fstart % grid) / fspan);
+    *width = (int16_t)((uint64_t)WIDTH * 10U * grid / fspan);
+  } else if (grid > 1000) {
+    *offset = (WIDTH) * ((fstart % grid) / 100) / (fspan / 100);
+    *width = (WIDTH) * (grid / 100) / (fspan / 1000);
   } else {
-    grid_offset = (WIDTH) * ((fstart % grid)) / (fspan);
-    grid_width = (WIDTH) * (grid) / (fspan/10);
+    *offset = (WIDTH) * ((fstart % grid)) / (fspan);
+    *width = (WIDTH) * (grid) / (fspan/10);
   }
+  if (*width < 1)
+    *width = 1;
   if (config.gridlines == 0)
-    grid_offset = 0;
+    *offset = 0;
+}
+
+static void apply_grid(int16_t offset, int16_t width, freq_t span)
+{
+  grid_offset = offset;
+  grid_width = width;
+  grid_span = span;
 //  if (setting.waterfall)
   set_level_meter_or_waterfall();
   redraw_request |= REDRAW_FREQUENCY | REDRAW_AREA;
+}
+
+void update_grid(void)
+{
+  int16_t offset;
+  int16_t width;
+  freq_t span;
+  calculate_grid(&offset, &width, &span);
+  apply_grid(offset, width, span);
+}
+
+void update_grid_if_changed(void)
+{
+  int16_t offset;
+  int16_t width;
+  freq_t span;
+  calculate_grid(&offset, &width, &span);
+  if (offset != grid_offset || width != grid_width || span != grid_span)
+    apply_grid(offset, width, span);
 }
 
 #if 0
