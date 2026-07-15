@@ -5849,7 +5849,7 @@ static volatile int dummy;
     } else if (actual_max_level > target_level && setting.attenuate_x2 < 60) {
       delta = actual_max_level - target_level;
     }
-    if (chVTGetSystemTimeX() - sweep_elapsed > MS2ST(1000)){
+    if (chVTGetSystemTimeX() - sweep_elapsed > TIME_MS2I(1000)){
       if (( delta < -5 || delta > +5) || delta > 10 ) {
       setting.attenuate_x2 += delta + delta;
       if (setting.attenuate_x2 < 0)

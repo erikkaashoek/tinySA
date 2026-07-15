@@ -209,7 +209,7 @@ static THD_FUNCTION(Thread1, arg)
       {
         completed = sweep(true);
 #ifdef __USE_SD_CARD__
-        if (setting.trigger_auto_save && (last_auto_save == 0 ||  chVTGetSystemTimeX() - last_auto_save > S2ST(30)) ) { // once every 30 seconds max
+        if (setting.trigger_auto_save && (last_auto_save == 0 ||  chVTGetSystemTimeX() - last_auto_save > TIME_S2I(30)) ) { // once every 30 seconds max
           uint16_t old_mode = config._mode;
           config._mode |= _MODE_AUTO_FILENAME;
           save_csv(1+(2<<0));      // frequencies + trace 1
@@ -455,7 +455,7 @@ VNA_SHELL_FUNCTION(cmd_restart)
   (void)argc;
   (void)argv;
   if (argc == 1) {
-    restart_interval = S2ST(my_atoi(argv[0]));
+    restart_interval = TIME_S2I(my_atoi(argv[0]));
     if (restart_interval) {
       restart_set_time =  chVTGetSystemTimeX();
       if (restart_set_time == 0)
@@ -2418,7 +2418,7 @@ VNA_SHELL_FUNCTION(cmd_threads)
 #endif
     shell_printf("%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s"VNA_SHELL_NEWLINE_STR,
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
+             (uint32_t)tp->refs - 1, (uint32_t)tp->hdr.pqueue.prio, states[tp->state],
              tp->name == NULL ? "" : tp->name);
     tp = chRegNextThread(tp);
   } while (tp != NULL);
@@ -2697,18 +2697,21 @@ void shell_update_speed(void){
 }
 
 void shell_reset_console(void){
+  osalSysLock();
   // Reset I/O queue over USB (for USB need also connect/disconnect)
   if (usb_IsActive()){
     if (config._mode & _MODE_SERIAL)
-      sduDisconnectI(&SDU1);
+      sduSuspendHookI(&SDU1);
     else
       sduConfigureHookI(&SDU1);
   }
   // Reset I/O queue over Serial
 //  oqResetI(&SD1.oqueue);
 //  iqResetI(&SD1.iqueue);
-  qResetI(&SD1.oqueue);
-  qResetI(&SD1.iqueue);
+  oqResetI(&SD1.oqueue);
+  iqResetI(&SD1.iqueue);
+  osalOsRescheduleS();
+  osalSysUnlock();
 
 }
 
@@ -2886,7 +2889,7 @@ static void VNAShell_executeLine(char *line)
         int timeout_count = 0;
         msg_t result;
         do {
-          result = osalThreadEnqueueTimeoutS(&shell_thread, MS2ST(5000));  // 5 second timeout
+          result = osalThreadEnqueueTimeoutS(&shell_thread, TIME_MS2I(5000));  // 5 second timeout
           if (result == MSG_TIMEOUT) {
             timeout_count++;
             if (timeout_count > 3) {
@@ -3003,6 +3006,7 @@ static PWMConfig pwmcfg = {
    {PWM_OUTPUT_DISABLED, NULL},
    {PWM_OUTPUT_DISABLED, NULL}
   },
+  0,
   0,
   0
 };
@@ -3516,7 +3520,7 @@ void hard_fault_handler_c(uint32_t *sp)
 #endif
     lcd_printf(x, y+=FONT_STR_HEIGHT, "%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s",
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
+             (uint32_t)tp->refs - 1, (uint32_t)tp->hdr.pqueue.prio, states[tp->state],
              tp->name == NULL ? "" : tp->name);
     tp = chRegNextThread(tp);
   } while (tp != NULL);

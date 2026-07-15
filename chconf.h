@@ -29,6 +29,9 @@
 #define _CHCONF_H_
 
 #define _CHIBIOS_RT_CONF_
+#define _CHIBIOS_RT_CONF_VER_7_0_
+
+#define CH_CFG_SMP_MODE                     FALSE
 
 /*===========================================================================*/
 /**
@@ -49,6 +52,8 @@
  *          setting also defines the system tick time unit.
  */
 #define CH_CFG_ST_FREQUENCY                 10000
+#define CH_CFG_INTERVALS_SIZE               32
+#define CH_CFG_TIME_TYPES_SIZE              32
 
 /**
  * @brief   Time delta constant for the tick-less mode.
@@ -140,6 +145,7 @@
  * @note    The default is @p TRUE.
  */
 #define CH_CFG_USE_TM                       FALSE
+#define CH_CFG_USE_TIMESTAMP                FALSE
 
 /**
  * @brief   Threads registry APIs.
@@ -305,6 +311,20 @@
  */
 #define CH_CFG_USE_MEMPOOLS                 FALSE
 
+#define CH_CFG_USE_OBJ_FIFOS                FALSE
+#define CH_CFG_USE_PIPES                    FALSE
+#define CH_CFG_USE_OBJ_CACHES               FALSE
+#define CH_CFG_USE_DELEGATES                FALSE
+#define CH_CFG_USE_JOBS                     FALSE
+#define CH_CFG_USE_FACTORY                  FALSE
+#define CH_CFG_FACTORY_MAX_NAMES_LENGTH     8
+#define CH_CFG_FACTORY_OBJECTS_REGISTRY     FALSE
+#define CH_CFG_FACTORY_GENERIC_BUFFERS      FALSE
+#define CH_CFG_FACTORY_SEMAPHORES           FALSE
+#define CH_CFG_FACTORY_MAILBOXES            FALSE
+#define CH_CFG_FACTORY_OBJ_FIFOS            FALSE
+#define CH_CFG_FACTORY_PIPES                FALSE
+
 /**
  * @brief   Dynamic Threads APIs.
  * @details If enabled then the dynamic threads creation APIs are included
@@ -417,6 +437,18 @@
  */
 /*===========================================================================*/
 
+#define CH_CFG_SYSTEM_EXTRA_FIELDS                                          \
+  /* No custom system fields.*/
+
+#define CH_CFG_SYSTEM_INIT_HOOK() {                                         \
+}
+
+#define CH_CFG_OS_INSTANCE_EXTRA_FIELDS                                     \
+  /* No custom instance fields.*/
+
+#define CH_CFG_OS_INSTANCE_INIT_HOOK(oip) {                                 \
+}
+
 /**
  * @brief   Threads descriptor structure extension.
  * @details User fields added to the end of the @p thread_t structure.
@@ -520,6 +552,9 @@
  */
 #define CH_CFG_TRACE_HOOK(tep) {                                            \
   /* Trace code here.*/                                                     \
+}
+
+#define CH_CFG_RUNTIME_FAULTS_HOOK(mask) {                                  \
 }
 
 /** @} */

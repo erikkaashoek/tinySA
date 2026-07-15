@@ -1509,7 +1509,13 @@ int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
   // Init small cell print stream
   struct cellprintStreamVMT {
     _base_sequential_stream_methods
-  } cell_vmt = {NULL, NULL, NULL, NULL};
+  } cell_vmt = {
+    .instance_offset = 0U,
+    .write = NULL,
+    .read = NULL,
+    .put = NULL,
+    .get = NULL
+  };
   screenPrintStream ps = {&cell_vmt, x, y};
   // Select font and skip print if not on cell (at top/bottom)
   switch (*fmt++){

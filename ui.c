@@ -48,10 +48,10 @@ uistat_t uistat = {
 #define EVT_DOWN                    0x20
 #define EVT_REPEAT                  0x40
 
-#define BUTTON_DOWN_LONG_TICKS      MS2ST(500)   // 500ms
-#define BUTTON_DOUBLE_TICKS         MS2ST(250)   // 250ms
-#define BUTTON_REPEAT_TICKS         MS2ST( 40)   //  40ms
-#define BUTTON_DEBOUNCE_TICKS       MS2ST(  2)   //   2ms
+#define BUTTON_DOWN_LONG_TICKS      TIME_MS2I(500) // 500ms
+#define BUTTON_DOUBLE_TICKS         TIME_MS2I(250) // 250ms
+#define BUTTON_REPEAT_TICKS         TIME_MS2I(40)  //  40ms
+#define BUTTON_DEBOUNCE_TICKS       TIME_MS2I(2)   //   2ms
 
 /* lever switch assignment */
 #define BIT_UP1     3
@@ -684,7 +684,7 @@ extern const char *states[];
 #endif
     lcd_printf(x, y+=bFONT_STR_HEIGHT, "%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s",
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
+             (uint32_t)tp->refs - 1, (uint32_t)tp->hdr.pqueue.prio, states[tp->state],
              tp->name == NULL ? "" : tp->name);
     tp = chRegNextThread(tp);
   } while (tp != NULL);
@@ -1599,10 +1599,12 @@ static const menuitem_t  menu_calibrate_normal[];
 #endif
 static const menuitem_t  menu_calibrate[];
 static const menuitem_t  menu_sweep[];
+#ifdef TINYSA4
 static const menuitem_t  menu_settings[];
-static const menuitem_t  menu_settings2[];
 static const menuitem_t  menu_lowoutput_settings[];
 static const menuitem_t  menu_lowoutput_settings_max[];
+#endif
+static const menuitem_t  menu_settings2[];
 extern bool dirty;
 char range_text[20];
 #ifdef TINYSA4
@@ -8382,10 +8384,9 @@ ui_process(void)
 }
 
 /* Triggered when the button is pressed or released. The LED4 is set to ON.*/
-static void extcb1(EXTDriver *extp, expchannel_t channel)
+static void extcb1(void *arg)
 {
-  (void)extp;
-  (void)channel;
+  uint32_t channel = (uint32_t)(uintptr_t)arg;
 #ifdef  __USE_SD_CARD__
   if (channel == 12)
     SD_PowerOff();
@@ -8397,42 +8398,6 @@ static void extcb1(EXTDriver *extp, expchannel_t channel)
   // cur_button = READ_PORT() & BUTTON_MASK;
 }
 
-static const EXTConfig extcfg = {
-  {
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_RISING_EDGE | EXT_CH_MODE_AUTOSTART | EXT_MODE_GPIOA, extcb1},
-    {EXT_CH_MODE_RISING_EDGE | EXT_CH_MODE_AUTOSTART | EXT_MODE_GPIOA, extcb1},
-    {EXT_CH_MODE_RISING_EDGE | EXT_CH_MODE_AUTOSTART | EXT_MODE_GPIOA, extcb1},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-#ifdef __WAIT_CTS_WHILE_SLEEPING__
-    {EXT_CH_MODE_RISING_EDGE | EXT_CH_MODE_AUTOSTART | EXT_MODE_GPIOB, extcb1},
-#else
-    {EXT_CH_MODE_DISABLED, NULL},
-#endif
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-#ifdef  __USE_SD_CARD__
-    {EXT_CH_MODE_RISING_EDGE | EXT_CH_MODE_AUTOSTART | EXT_MODE_GPIOB, extcb1},
-#else
-    {EXT_CH_MODE_DISABLED, NULL},
-#endif
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL},
-    {EXT_CH_MODE_DISABLED, NULL}
-  }
-};
-
 void
 handle_touch_interrupt(void)
 {
@@ -8442,8 +8407,24 @@ handle_touch_interrupt(void)
 void
 ui_init()
 {
-  // Activates the EXT driver 1.
-  extStart(&EXTD1, &extcfg);
+  /* HAL 9.1 routes STM32 EXTI through PAL line events. */
+  palSetLineCallback(PAL_LINE(GPIOA, GPIOA_LEVER1), extcb1,
+                     (void *)(uintptr_t)GPIOA_LEVER1);
+  palEnableLineEvent(PAL_LINE(GPIOA, GPIOA_LEVER1), PAL_EVENT_MODE_RISING_EDGE);
+  palSetLineCallback(PAL_LINE(GPIOA, GPIOA_PUSH), extcb1,
+                     (void *)(uintptr_t)GPIOA_PUSH);
+  palEnableLineEvent(PAL_LINE(GPIOA, GPIOA_PUSH), PAL_EVENT_MODE_RISING_EDGE);
+  palSetLineCallback(PAL_LINE(GPIOA, GPIOA_LEVER2), extcb1,
+                     (void *)(uintptr_t)GPIOA_LEVER2);
+  palEnableLineEvent(PAL_LINE(GPIOA, GPIOA_LEVER2), PAL_EVENT_MODE_RISING_EDGE);
+#ifdef __WAIT_CTS_WHILE_SLEEPING__
+  palSetLineCallback(LINE_RX_CTS, extcb1, (void *)(uintptr_t)9U);
+  palEnableLineEvent(LINE_RX_CTS, PAL_EVENT_MODE_RISING_EDGE);
+#endif
+#ifdef __USE_SD_CARD__
+  palSetLineCallback(LINE_SD_CD, extcb1, (void *)(uintptr_t)12U);
+  palEnableLineEvent(LINE_SD_CD, PAL_EVENT_MODE_RISING_EDGE);
+#endif
   // Init touch subsystem
   touch_init();
 }

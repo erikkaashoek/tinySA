@@ -32,6 +32,7 @@
  */
 
 #define STM32F3xx_MCUCONF
+#define STM32F303_MCUCONF
 
 /*
  * HAL driver system settings.
@@ -111,9 +112,9 @@
 //#define STM32_ADC_ADC4_DMA_STREAM           STM32_DMA_STREAM_ID(2, 2)
 #define STM32_ADC_ADC12_DMA_PRIORITY        2
 //#define STM32_ADC_ADC34_DMA_PRIORITY        2
-#define STM32_ADC_ADC12_IRQ_PRIORITY        2
+#define STM32_ADC_ADC12_IRQ_PRIORITY        3
 //#define STM32_ADC_ADC34_IRQ_PRIORITY        5
-#define STM32_ADC_ADC12_DMA_IRQ_PRIORITY    2
+#define STM32_ADC_ADC12_DMA_IRQ_PRIORITY    3
 //#define STM32_ADC_ADC34_DMA_IRQ_PRIORITY    5
 //#define STM32_ADC_ADC12_CLOCK_MODE          ADC_CCR_CKMODE_ADCCK
 //#define STM32_ADC_ADC12_CLOCK_MODE          ADC_CCR_CKMODE_AHB_DIV2
@@ -157,10 +158,10 @@
 #define STM32_GPT_USE_TIM2                  FALSE
 #define STM32_GPT_USE_TIM3                  FALSE
 #define STM32_GPT_USE_TIM4                  TRUE
-#define STM32_GPT_TIM1_IRQ_PRIORITY         2
-#define STM32_GPT_TIM2_IRQ_PRIORITY         2
-#define STM32_GPT_TIM3_IRQ_PRIORITY         2
-#define STM32_GPT_TIM4_IRQ_PRIORITY         2
+#define STM32_GPT_TIM1_IRQ_PRIORITY         3
+#define STM32_GPT_TIM2_IRQ_PRIORITY         3
+#define STM32_GPT_TIM3_IRQ_PRIORITY         3
+#define STM32_GPT_TIM4_IRQ_PRIORITY         3
 
 /*
  * I2C driver system settings.
@@ -184,8 +185,8 @@
                                              STM32_I2S_MODE_RX)
 #define STM32_I2S_SPI2_MODE                 (STM32_I2S_MODE_SLAVE |        \
                                              STM32_I2S_MODE_RX )
-#define STM32_I2S_SPI1_IRQ_PRIORITY         2
-#define STM32_I2S_SPI2_IRQ_PRIORITY         2
+#define STM32_I2S_SPI1_IRQ_PRIORITY         3
+#define STM32_I2S_SPI2_IRQ_PRIORITY         3
 #define STM32_I2S_SPI1_DMA_PRIORITY         1
 #define STM32_I2S_SPI2_DMA_PRIORITY         1
 #define STM32_I2S_SPI1_RX_DMA_STREAM        STM32_DMA_STREAM_ID(1, 2)
@@ -233,14 +234,14 @@
 #define STM32_SPI_SPI1_TX_DMA_STREAM        STM32_DMA_STREAM_ID(1, 3)
 #define STM32_SPI_SPI1_DMA_PRIORITY         1
 #define STM32_SPI_SPI2_DMA_PRIORITY         1
-#define STM32_SPI_SPI1_IRQ_PRIORITY         2
-#define STM32_SPI_SPI2_IRQ_PRIORITY         2
+#define STM32_SPI_SPI1_IRQ_PRIORITY         3
+#define STM32_SPI_SPI2_IRQ_PRIORITY         3
 #define STM32_SPI_DMA_ERROR_HOOK(spip)      osalSysHalt("DMA failure")
 
 /*
  * ST driver system settings.
  */
-#define STM32_ST_IRQ_PRIORITY               2
+#define STM32_ST_IRQ_PRIORITY               3
 #define STM32_ST_USE_TIMER                  2
 
 /*

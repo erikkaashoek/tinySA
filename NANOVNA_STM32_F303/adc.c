@@ -36,54 +36,67 @@ static adcsample_t samplesVBAT[ADC_GRP_NUM_CHANNELS_VBAT];
 static adcsample_t samples[1];
 
 static const ADCConversionGroup adcgrpcfgVBAT = {
-  FALSE,
-  ADC_GRP_NUM_CHANNELS_VBAT,
-  NULL,
-  NULL,
-  ADC_CFGR_CONT | ADC_CFGR1_RES_12BIT,       // CFGR1
-  ADC_TR(0, 0),                              // ADC watchdog threshold TR1
-  {0, ADC_SMPR2_SMP_AN16(ADC_VBAT_SMP_TIME) | ADC_SMPR2_SMP_AN17(ADC_VBAT_SMP_TIME)/*| ADC_SMPR2_SMP_AN18(ADC_VBAT_SMP_TIME)*/}, // SMPR
-  {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN17) | ADC_SQR1_SQ2_N(ADC_CHANNEL_IN18)/*| ADC_SQR1_SQ3_N(ADC_CHANNEL_IN16)*/, 0, 0, 0}           // CHSELR
+  .circular = false,
+  .num_channels = ADC_GRP_NUM_CHANNELS_VBAT,
+  .end_cb = NULL,
+  .error_cb = NULL,
+  .cfgr = ADC_CFGR_CONT | ADC_CFGR_RES_12BITS,
+  .tr1 = ADC_TR(0, 0),
+  .tr2 = ADC_TR_DISABLED,
+  .tr3 = ADC_TR_DISABLED,
+  .awd2cr = 0U,
+  .awd3cr = 0U,
+  .smpr = {0, ADC_SMPR2_SMP_AN16(ADC_VBAT_SMP_TIME) |
+              ADC_SMPR2_SMP_AN17(ADC_VBAT_SMP_TIME)},
+  .sqr = {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN17) |
+          ADC_SQR1_SQ2_N(ADC_CHANNEL_IN18), 0, 0, 0}
 };
 
 static const ADCConversionGroup adcgrpcfgVersion = {
-  FALSE,
-  1,
-  NULL,
-  NULL,
-  ADC_CFGR1_RES_12BIT,       // CFGR1
-  ADC_TR(0, 0),                              // ADC watchdog threshold TR1
-  {ADC_SMPR1_SMP_AN1(ADC_TOUCH_XY_SMP_TIME), 0}, /* SMPR[2] */
-  {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN1), 0, 0, 0} /* SQR[4]  */
+  .circular = false,
+  .num_channels = 1,
+  .end_cb = NULL,
+  .error_cb = NULL,
+  .cfgr = ADC_CFGR_RES_12BITS,
+  .tr1 = ADC_TR(0, 0),
+  .tr2 = ADC_TR_DISABLED,
+  .tr3 = ADC_TR_DISABLED,
+  .awd2cr = 0U,
+  .awd3cr = 0U,
+  .smpr = {ADC_SMPR1_SMP_AN1(ADC_TOUCH_XY_SMP_TIME), 0},
+  .sqr = {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN1), 0, 0, 0}
 };
 
 static const ADCConversionGroup adcgrpcfgTouch = {
-  TRUE,                // Enables the circular buffer mode for the group.
-  1,                   // Number of the analog channels belonging to the conversion group.
-  NULL,                // adccallback_touch
-  NULL,                // adcerrorcallback_touch
-                       // CFGR
-  ADC_CFGR_EXTEN_0     // rising edge of external trigger
-
-  | ADC_CFGR_EXTSEL_3 | ADC_CFGR_EXTSEL_0  // EXT4 0x1001 event (TIM1_TRGO)
-//  | ADC_CFGR_EXTSEL_2  // EXT4 0x100 event (TIM3_TRGO)
-
-
-  | ADC_CFGR_AWD1EN,   // Enable Analog watchdog check interrupt
-  ADC_TR(0, TOUCH_THRESHOLD),                 // Analog watchdog threshold TR1, interrupt on touch press
-  {ADC_SMPR1_SMP_AN4(ADC_TOUCH_SMP_TIME), 0}, // SMPR[2]
-  {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN4), 0, 0, 0}  // SQR[4]
+  .circular = true,
+  .num_channels = 1,
+  .end_cb = NULL,
+  .error_cb = NULL,
+  .cfgr = ADC_CFGR_EXTEN_0 | ADC_CFGR_EXTSEL_3 | ADC_CFGR_EXTSEL_0 |
+          ADC_CFGR_AWD1EN,
+  .tr1 = ADC_TR(0, TOUCH_THRESHOLD),
+  .tr2 = ADC_TR_DISABLED,
+  .tr3 = ADC_TR_DISABLED,
+  .awd2cr = 0U,
+  .awd3cr = 0U,
+  .smpr = {ADC_SMPR1_SMP_AN4(ADC_TOUCH_SMP_TIME), 0},
+  .sqr = {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN4), 0, 0, 0}
 };
 
 static ADCConversionGroup adcgrpcfgXY = {
-  FALSE,
-  1,
-  NULL,                         /* adccallback_touch */
-  NULL,                         /* adcerrorcallback_touch */
-  ADC_CFGR1_RES_12BIT,          /* CFGR */
-  ADC_TR(0, 0),                 /* TR1     */
-  {ADC_SMPR1_SMP_AN3(ADC_TOUCH_XY_SMP_TIME) | ADC_SMPR1_SMP_AN4(ADC_TOUCH_XY_SMP_TIME), 0}, /* SMPR[2] */
-  {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN3), 0, 0, 0} /* SQR[4]  */
+  .circular = false,
+  .num_channels = 1,
+  .end_cb = NULL,
+  .error_cb = NULL,
+  .cfgr = ADC_CFGR_RES_12BITS,
+  .tr1 = ADC_TR(0, 0),
+  .tr2 = ADC_TR_DISABLED,
+  .tr3 = ADC_TR_DISABLED,
+  .awd2cr = 0U,
+  .awd3cr = 0U,
+  .smpr = {ADC_SMPR1_SMP_AN3(ADC_TOUCH_XY_SMP_TIME) |
+           ADC_SMPR1_SMP_AN4(ADC_TOUCH_XY_SMP_TIME), 0},
+  .sqr = {ADC_SQR1_SQ1_N(ADC_CHANNEL_IN3), 0, 0, 0}
 };
 
 void adc_init(void)
@@ -120,7 +133,7 @@ int16_t adc_vbat_read(void)
 // Vbat measure averange count = 2^VBAT_AVERAGE
 #define VBAT_AVERAGE 4
 // Measure vbat every 5 second
-#define VBAT_MEASURE_INTERVAL   S2ST(5)
+#define VBAT_MEASURE_INTERVAL   TIME_S2I(5)
 
   static int16_t   vbat_raw = 0;
   static systime_t vbat_time = -VBAT_MEASURE_INTERVAL-1;
@@ -219,7 +232,7 @@ uint16_t adc_multi_read(uint32_t chsel, uint16_t *result, uint32_t count)
   VNA_ADC->IER    = 0;
   VNA_ADC->TR     = ADC_TR(0, 0);
   VNA_ADC->SMPR   = ADC_SMPR_SMP_1P5;
-  VNA_ADC->CFGR1  = ADC_CFGR1_RES_12BIT;
+  VNA_ADC->CFGR  = ADC_CFGR_RES_12BITS;
   VNA_ADC->CHSELR = chsel;
 
 

@@ -881,7 +881,13 @@ int lcd_printf(int16_t x, int16_t y, const char *fmt, ...) {
   // Init small lcd print stream
   struct lcd_printStreamVMT {
     _base_sequential_stream_methods
-  } lcd_vmt = {NULL, NULL, put_char, NULL};
+  } lcd_vmt = {
+    .instance_offset = 0U,
+    .write = NULL,
+    .read = NULL,
+    .put = put_char,
+    .get = NULL
+  };
   lcdPrintStream ps = {&lcd_vmt, x, y, x, y};
   // Performing the print operation using the common code.
   va_list ap;
@@ -1357,7 +1363,7 @@ static uint8_t SD_WaitNotBusy(uint32_t wait_time) {
 // Receive data block from SD
 static bool SD_RxDataBlock(uint8_t *buff, uint16_t len, uint8_t token) {
   // loop until receive read response token or timeout ~50ms
-  if (!SD_WaitDataToken(token, MS2ST(50))) {
+  if (!SD_WaitDataToken(token, TIME_MS2I(50))) {
     DEBUG_PRINT(" rx SD_WaitDataToken err\r\n");
     return FALSE;
   }
@@ -1408,7 +1414,7 @@ static bool SD_TxDataBlock(const uint8_t *buff, uint16_t len, uint8_t token) {
   }
 #if 1
   // Wait busy (recommended timeout is 250ms (500ms for SDXC) set 250ms
-  resp = SD_WaitNotBusy(MS2ST(250));
+  resp = SD_WaitNotBusy(TIME_MS2I(250));
   if (resp == 0xFF)
     return TRUE;
 #else
@@ -1427,7 +1433,7 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
   uint8_t buf[6];
   volatile uint8_t r1;
   // wait SD ready after last Tx (recommended timeout is 250ms (500ms for SDXC) set 250ms
-  if ((r1 = SD_WaitNotBusy(MS2ST(500))) != 0xFF) {
+  if ((r1 = SD_WaitNotBusy(TIME_MS2I(500))) != 0xFF) {
     DEBUG_PRINT(" SD_WaitNotBusy CMD%d err, %02x\r\n", cmd-0x40, (uint32_t)r1);
     return 0xFF;
   }
@@ -1707,7 +1713,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     // Nothing to do for this command if each write operation to the media is completed
     // within the disk_write function.
     case CTRL_SYNC:
-      if (SD_WaitNotBusy(MS2ST(200)) == 0xFF) res = RES_OK;
+      if (SD_WaitNotBusy(TIME_MS2I(200)) == 0xFF) res = RES_OK;
     break;
 #if FF_USE_TRIM == 1
     // Informs the device the data on the block of sectors is no longer needed and it can be erased.
