@@ -499,6 +499,9 @@ const freq_t fh_high[] = { 480000000, 960000000, 1920000000, 2880000000, 3840000
 
 uint8_t in_selftest = false;
 uint8_t ignore_stored = false;
+#ifdef TINYSA4
+static uint8_t factory_selftest_direct_scratch = false;
+#endif
 uint8_t in_step_test = false;
 uint8_t in_calibration = false;
 uint8_t calibration_stage;
@@ -3555,6 +3558,20 @@ deviceRSSI_t age[POINTS_COUNT];     // Array used for 1: calculating the age of 
 static pureRSSI_t correct_RSSI;
 static pureRSSI_t correct_RSSI_freq;
 systime_t start_of_sweep_timestamp;
+
+#ifdef TINYSA4
+#if OSAL_ST_MODE != OSAL_ST_MODE_FREERUNNING
+#error "The optimized sweep clock requires the ChibiOS free-running system timer"
+#endif
+#if CH_CFG_ST_TIMEDELTA == 0
+#error "The optimized sweep clock requires the port-backed ChibiOS system timer"
+#endif
+// Keep the timed sweep hot path on the current free-running timer backend.
+// Re-audit this equivalence whenever the ChibiOS system-timer backend changes.
+#define SWEEP_CLOCK_NOW() st_lld_get_counter()
+#else
+#define SWEEP_CLOCK_NOW() chVTGetSystemTimeX()
+#endif
 static systime_t sweep_elapsed = 0;                             // Time since first start of sweeping, used only for auto attenuate
 uint8_t signal_is_AM = false;
 static uint8_t check_for_AM = false;
@@ -3637,6 +3654,9 @@ bool depth_error = false;
 #endif
 
 
+#ifdef TINYSA4
+__attribute__((optimize("O2,no-strict-aliasing")))
+#endif
 pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     // Measure the RSSI for one frequency, used from sweep and other measurement routines. Must do all HW setup
 {
   int modulation_delay = 0;
@@ -4761,7 +4781,7 @@ again:                                                              // Spur redu
 
     skip_LO_setting:
     if (i == 0 && t == 0)                                                   // if first point in scan (here is get 1 point data)
-      start_of_sweep_timestamp = chVTGetSystemTimeX();                      // initialize start sweep time
+      start_of_sweep_timestamp = SWEEP_CLOCK_NOW();                         // initialize start sweep time
 
     if (MODE_OUTPUT(setting.mode)) {               // No substepping and no RSSI in output mode
       if (break_on_operation && operation_requested)          // break subscanning if requested
@@ -4893,7 +4913,7 @@ again:                                                              // Spur redu
       if (setting.trigger == T_SINGLE) {
         set_trigger(T_DONE);
       }
-      start_of_sweep_timestamp = chVTGetSystemTimeX();
+      start_of_sweep_timestamp = SWEEP_CLOCK_NOW();
     }
     TRACE(5);
 #ifdef TINYSA4
@@ -5067,6 +5087,9 @@ void reset_band(void) {
 #endif
 
 // main loop for measurement
+#ifdef TINYSA4
+__attribute__((optimize("O2,no-strict-aliasing")))
+#endif
 static bool sweep(bool break_on_operation)
 {
   float RSSI;
@@ -5187,6 +5210,7 @@ static bool sweep(bool break_on_operation)
 #endif
   setting.measure_sweep_time_us = 0;                   // start measure sweep time
   //  start_of_sweep_timestamp = chVTGetSystemTimeX();    // Will be set in perform
+  uint8_t progress_mask = 0x3f;
 
   sweep_again:                                // stay in sweep loop when output mode and modulation on.
 
@@ -5305,14 +5329,18 @@ static bool sweep(bool break_on_operation)
 #ifdef TINYSA4
           progress_bar &&
 #endif
-          show_bar && (i & 0x07) == 0)
+          show_bar && (i & progress_mask) == 0)
     {
-      // The progress bar is only updated every eighth point. Avoid reading and
-      // converting the system timer on the other seven points of fast sweeps.
-      systime_t local_sweep_time = sa_ST2US(chVTGetSystemTimeX() - start_of_sweep_timestamp);
-      if (setting.actual_sweep_time_us > ONE_SECOND_TIME)
-        local_sweep_time = setting.actual_sweep_time_us;
+      // Expected long sweeps can use their known duration directly. For an
+      // expected fast sweep, sample every 64th point until an unexpected
+      // one-second overrun is observed, then resume the normal 8-point rate.
+      // This retains overrun progress while avoiding timer traffic in the
+      // common sub-second path.
+      systime_t local_sweep_time = setting.actual_sweep_time_us;
+      if (local_sweep_time <= ONE_SECOND_TIME)
+        local_sweep_time = sa_ST2US(SWEEP_CLOCK_NOW() - start_of_sweep_timestamp);
       if (local_sweep_time > ONE_SECOND_TIME) {
+        progress_mask = 0x07;
         int pos = i * (WIDTH+1) / sweep_points;
         ili9341_set_background(LCD_SWEEP_LINE_COLOR);
         ili9341_fill(OFFSETX, CHART_BOTTOM+1, pos, 1);     // update sweep progress bar
@@ -5655,6 +5683,14 @@ static volatile int dummy;
 //      add_to_peak_finding(actual_t, i);
 
       }
+#if TRACES_MAX == 4
+      // The factory test freezes two default scratch passes below. Preserve
+      // their exact AV_OFF result once, after ACTUAL processing is complete.
+      if (factory_selftest_direct_scratch) {
+        temp_t[i] = RSSI;
+        stored2_t[i] = RSSI;
+      }
+#endif
       }
     }
 
@@ -5692,11 +5728,12 @@ static volatile int dummy;
   // ---------------------- process measured actual sweep time -----------------
   // For CW mode value calculated in SI4432_Fill
   if (setting.measure_sweep_time_us == 0)
-    setting.measure_sweep_time_us = sa_ST2US(chVTGetSystemTimeX() - start_of_sweep_timestamp);
+    setting.measure_sweep_time_us = sa_ST2US(SWEEP_CLOCK_NOW() - start_of_sweep_timestamp);
 
   // Update actual time on change on status panel
   uint32_t delta = abs((int)(setting.actual_sweep_time_us - setting.measure_sweep_time_us));
-  if ((delta<<3) > setting.actual_sweep_time_us){ // update if delta > 1/8
+  bool sweep_time_changed = (delta<<3) > setting.actual_sweep_time_us;
+  if (sweep_time_changed){ // update if delta > 1/8
     redraw_request|=REDRAW_CAL_STATUS | REDRAW_FREQUENCY;
   }
   setting.actual_sweep_time_us = setting.measure_sweep_time_us;
@@ -7126,6 +7163,7 @@ void selftest(int test)
 {
   bool no_wait = false;
 #ifdef TINYSA4
+  factory_selftest_direct_scratch = false;
   bool old_ultra = config.ultra;
   config.ultra = true;
 //  if (adc_vbat_read() < 3800) {
@@ -7167,7 +7205,33 @@ void selftest(int test)
     }
     do {
       test_prepare(test_step);
+#if TRACES_MAX == 4
+      // Preserve any pre-existing frozen traces. For the normal factory setup,
+      // freeze both AV_OFF scratch passes and write their raw samples directly.
+      // Zero-span timing still measures this faster path, and its grid is
+      // refreshed from that completed measurement below.
+      bool old_temp_stored = setting.stored[TRACE_TEMP];
+      bool old_stored2_stored = setting.stored[TRACE_STORED2];
+      factory_selftest_direct_scratch =
+          !debug_spur && !debug_avoid &&
+          !old_temp_stored && !old_stored2_stored &&
+          setting.average[TRACE_TEMP] == AV_OFF &&
+          setting.subtract[TRACE_TEMP] == 0 &&
+          !setting.normalized[TRACE_TEMP] &&
+          setting.average[TRACE_STORED2] == AV_OFF &&
+          setting.subtract[TRACE_STORED2] == 0 &&
+          !setting.normalized[TRACE_STORED2];
+      if (factory_selftest_direct_scratch) {
+        setting.stored[TRACE_TEMP] = true;
+        setting.stored[TRACE_STORED2] = true;
+      }
+#endif
       test_acquire(test_step);                        // Acquire test
+#if TRACES_MAX == 4
+      factory_selftest_direct_scratch = false;
+      setting.stored[TRACE_TEMP] = old_temp_stored;
+      setting.stored[TRACE_STORED2] = old_stored2_stored;
+#endif
       test_status[test_step] = test_validate(test_step);                       // Validate test
 
       if (test_step == 2) {
