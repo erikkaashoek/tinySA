@@ -95,7 +95,9 @@ endif
 ifeq ($(TARGET),F303)
   USE_FPU = hard
   USE_PROCESS_STACKSIZE = 0x480
-  USE_EXCEPTIONS_STACKSIZE = 0x200
+  # The fault reporter renders through the LCD/printf stack. Reserve room for
+  # its assembly veneer, an extended exception frame, and a nested ISR frame.
+  USE_EXCEPTIONS_STACKSIZE = 0x400
 endif
 
 #

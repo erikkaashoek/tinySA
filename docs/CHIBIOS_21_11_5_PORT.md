@@ -34,6 +34,8 @@ this port is marked ready.
   explicitly. ChibiOS 21.11.x no longer adds it automatically; omitting it
   promotes unsuffixed sweep constants to software double precision and causes
   a measurable self-test sweep regression.
+- Split the F303 HardFault entry into an assembly-only MSP/PSP veneer and an
+  ordinary non-returning C reporter, while reserving a 1 KiB exception stack.
 
 ## Build
 
