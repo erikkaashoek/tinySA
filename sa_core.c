@@ -5696,6 +5696,11 @@ static volatile int dummy;
     redraw_request|=REDRAW_CAL_STATUS | REDRAW_FREQUENCY;
   }
   setting.actual_sweep_time_us = setting.measure_sweep_time_us;
+  // The zero-span x axis represents the sweep that just completed. Recompute
+  // its tuple every time; update_grid_if_changed() suppresses redraws while
+  // the exact grid geometry remains unchanged.
+  if (FREQ_IS_CW())
+    update_grid_if_changed();
   // Not possible reduce sweep time, it minimum!
   if (setting.sweep_time_us < setting.actual_sweep_time_us && setting.additional_step_delay_us == 0){
 // Warning!! not correct set sweep time here, you get error!!

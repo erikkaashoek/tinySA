@@ -984,6 +984,7 @@ extern int8_t marker_tracking;
 
 void plot_init(void);
 void update_grid(void);
+void update_grid_if_changed(void);
 void request_to_redraw_grid(void);
 void redraw_frame(void);
 //void redraw_all(void);
