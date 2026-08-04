@@ -6349,8 +6349,9 @@ redraw_cal_status:
 #endif
 //  if (setting.mode == M_LOW) {
     // Attenuation
-    ili9341_set_foreground(setting.auto_attenuation ? LCD_FG_COLOR : LCD_BRIGHT_COLOR_GREEN);
-    lcd_printf(x, y, "Atten:\n%4.2FdB", get_attenuation());
+    const float attenuation = get_attenuation();
+    ili9341_set_foreground(setting.auto_attenuation ? (attenuation > 0.f ? LCD_BRIGHT_COLOR_RED : LCD_FG_COLOR) : LCD_BRIGHT_COLOR_GREEN);
+    lcd_printf(x, y, "Atten:\n%4.2FdB", attenuation);
     y = add_quick_menu(y+= YSTEP, (menuitem_t *)menu_atten);
 //  }
 
@@ -6364,7 +6365,7 @@ redraw_cal_status:
 #ifdef TINYSA3
   if (setting.spur_removal != S_OFF) {
 #endif
-    ili9341_set_foreground(setting.spur_removal == S_ON ? LCD_BRIGHT_COLOR_GREEN : LCD_FG_COLOR);
+    ili9341_set_foreground(setting.spur_removal == S_ON ? LCD_BRIGHT_COLOR_GREEN : (setting.spur_removal == S_OFF ? LCD_BRIGHT_COLOR_RED : LCD_FG_COLOR));
     lcd_printf(x, y, "Spur:\n%s", S_IS_AUTO(setting.spur_removal) ? "AUTO" : (setting.spur_removal == S_OFF ?"OFF" : "ON"));
     y = add_quick_menu(y += YSTEP, (menuitem_t *)menu_config);
 #ifdef TINYSA3
@@ -6413,7 +6414,7 @@ redraw_cal_status:
 #if 0                   // Activate for sweep time debugging
   lcd_printf(x, y, "%cScan:\n%5.3Fs", fscan[setting.step_delay_mode&7], (float)setting.sweep_time_us/ONE_SECOND_TIME);
 #endif
-  ili9341_set_foreground((setting.step_delay_mode&7) != 0 ? LCD_BRIGHT_COLOR_GREEN : LCD_FG_COLOR);
+  ili9341_set_foreground((setting.step_delay_mode&7) != 0 ? (setting.step_delay_mode == SD_FAST ? LCD_BRIGHT_COLOR_RED : LCD_BRIGHT_COLOR_GREEN) : LCD_FG_COLOR);
   lcd_printf(x, y, "%cScan:", fscan[setting.step_delay_mode&7]);
   ili9341_set_foreground((setting.step_delay || setting.sweep_time_us ) ? LCD_BRIGHT_COLOR_GREEN : LCD_FG_COLOR);
   lcd_printf(x, y+YSTEP, "%5.3Fs",(float)setting.actual_sweep_time_us/ONE_SECOND_TIME);
