@@ -70,8 +70,21 @@ endif
 # or     va.b-nnn-gxxxxxxx
 # or     ...
 
+VERSION_FILE = version.txt
+GIT_VERSION = $(strip $(shell git describe --tags --long --always --dirty 2>/dev/null))
+
+ifeq ($(GIT_VERSION),)
+  GIT_VERSION = unknown
+endif
+
+FILE_VERSION = $(strip $(shell cat $(VERSION_FILE) 2>/dev/null))
+
+ifneq ($(FILE_VERSION),$(GIT_VERSION))
+  $(shell printf '%s\n' '$(GIT_VERSION)' > $(VERSION_FILE))
+endif
+
 ifeq ($(VERSION),)
-  VERSION="$(PROJECT)_$(shell git describe --tags --long)"
+  VERSION="$(PROJECT)_$(GIT_VERSION)"
 endif
 
 ##############################################################################
@@ -295,6 +308,8 @@ ULIBS = -lm
 RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
 include $(RULESPATH)/rules.mk
 #include $(CHIBIOS)/memory.mk
+
+$(OBJS): $(VERSION_FILE)
 
 
 ifeq ($(TARGET),F303)

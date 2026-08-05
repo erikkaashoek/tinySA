@@ -1835,7 +1835,7 @@ int plot_printf(char *str, int, const char *fmt, ...);
 #define define_to_STR(x)  STR1(x)
 
 // sa_core.c
-
+#define MIN_RSSI_VALUE  ( -150 )
 typedef uint8_t  deviceRSSI_t;
 typedef int16_t  pureRSSI_t;
 extern int current_index;
