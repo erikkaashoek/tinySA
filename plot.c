@@ -1118,7 +1118,11 @@ draw_cell(int m, int n)
   // Generate grid type list
   uint32_t trace_type = 0;
 
-  if (IS_TRACES_ENABLED(TRACE_ACTUAL_FLAG|TRACE_STORED_FLAG|TRACE_TEMP_FLAG))
+  if (IS_TRACES_ENABLED(TRACE_ACTUAL_FLAG|TRACE_STORED_FLAG|TRACE_TEMP_FLAG
+#ifdef TINYSA4
+                        |TRACE_STORED2_FLAG
+#endif
+                        ))
     trace_type |= RECTANGULAR_GRID_MASK;
 
 #ifdef __HAM_BAND__
