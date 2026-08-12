@@ -8132,8 +8132,8 @@ static void sa_save_file(uint8_t format) {
               buf += plot_printf(buf, 100, "%U,", getFrequency(i));
           }
           if (file_mask & 2)  buf += plot_printf(buf, 100, "%.3f", value(measured[TRACE_ACTUAL][i]));
-          if (file_mask & 4)  buf += plot_printf(buf, 100, " %.3f ", value(measured[TRACE_STORED][i]));
-          if (file_mask & 8)  buf += plot_printf(buf, 100, " %.3f ", value(measured[TRACE_STORED2][i]));
+          if (file_mask & 4)  buf += plot_printf(buf, 100, " %.3f", value(measured[TRACE_STORED][i]));
+          if (file_mask & 8)  buf += plot_printf(buf, 100, " %.3f", value(measured[TRACE_STORED2][i]));
           if (file_mask & 16) buf += plot_printf(buf, 100, " %.3f", value(measured[TRACE_TEMP][i]));
           buf += plot_printf(buf, 100, "\r\n");
           res = f_write(fs_file, (char *)spi_buffer, buf - (char *)spi_buffer, &size);
