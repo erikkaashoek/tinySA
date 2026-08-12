@@ -592,6 +592,9 @@ void update_min_max_freq(void)
 void reset_settings(int m)
 {
 //  strcpy((char *)spi_buffer, dummy);
+#ifdef __SD_FILE_BROWSER__
+  sd_preset_path[0] = 0;              // active preset no longer comes from SD
+#endif
   setting.mode = m;
   setting.sweep = false;
   disable_waterfall();

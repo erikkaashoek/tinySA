@@ -102,6 +102,22 @@ void ui_set_keypad_text(const char *text)
   plot_printf(kp_buf, sizeof(kp_buf), "%s", text);
 }
 
+// Set when kp_buf holds a default that the next keypad must start with instead
+// of an empty buffer, so a single ENTER accepts it unchanged
+static bool keypad_text_preset = false;
+
+#ifdef __SD_FILE_BROWSER__
+// Preset the keypad input with the first len characters of text
+static void ui_preset_keypad_text(const char *text, int len)
+{
+  if (len > (int)sizeof(kp_buf) - 1)
+    len = sizeof(kp_buf) - 1;
+  memcpy(kp_buf, text, len);
+  kp_buf[len] = 0;
+  keypad_text_preset = true;
+}
+#endif
+
 static uint8_t ui_mode = UI_NORMAL;
 static uint8_t keypad_mode;
 static char   *kp_help_text = NULL;
@@ -4351,6 +4367,12 @@ static const char *file_ext[] = {
   [FMT_BND_FILE] = "bnd",
 };
 
+#ifdef __SD_FILE_BROWSER__
+// Full path of the preset last loaded from SD, empty when the active preset did
+// not come from SD (startup preset, stored slot or factory defaults).
+char sd_preset_path[FF_LFN_BUF] = {0};
+#endif
+
 static void sa_save_file(uint8_t format);
 
 static UI_FUNCTION_CALLBACK(menu_sdcard_cb) {
@@ -5304,6 +5326,7 @@ static const menuitem_t menu_display[] = {
 static const menuitem_t menu_unit[] =
 {
   { MT_ADV_CALLBACK,U_DBM,   "dBm",             menu_unit_acb},
+  { MT_ADV_CALLBACK,U_DBV,   "dBV",             menu_unit_acb},
   { MT_ADV_CALLBACK,U_DBMV,  "dBmV",            menu_unit_acb},
   { MT_ADV_CALLBACK,U_DBUV,  "dB"S_MICRO"V",    menu_unit_acb},
   { MT_ADV_CALLBACK,U_VOLT,  "Vrms",            menu_unit_acb},
@@ -6190,7 +6213,8 @@ float my_round(float v)
   }
   return v;
 }
-const char * const unit_string[MAX_UNIT_TYPE*2] = { "dBm", "dBmV", "dB"S_MICRO"V", "RAW", "Vrms", "Vpp", "W", "dB", "dB", "dB", "RAW", "Vrms", "Vpp", "W" }; // unit + 6 is delta unit
+const char * const unit_string[MAX_UNIT_TYPE*2] = { "dBm", "dBmV", "dB"S_MICRO"V", "RAW", "Vrms", "Vpp", "W", "dBV",
+                                                    "dB",  "dB",   "dB",           "RAW", "Vrms", "Vpp", "W", "dB" }; // unit + MAX_UNIT_TYPE is delta unit
 
 //static const float scale_value[]={50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20,10,5,2,1,0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002, 0.001,0.0005,0.0002, 0.0001};
 //static const char * const scale_vtext[]= {"50000", "20000", "10000", "5000", "2000", "1000", "500", "200", "100", "50", "20","10","5","2","1","0.5","0.2","0.1","0.05","0.02","0.01", "0.005","0.002","0.001", "0.0005","0.0002","0.0001"};
@@ -7846,8 +7870,19 @@ ui_process_keypad(void)
 {
   int status;
   int keypads_last_index = keypads[0].pos - 1;
-  kp_buf[0] = 0;
+  // Keep a preset default only when the keypad is really shown, a remote menu
+  // invoke must not silently accept it
+  bool preset_text = keypad_text_preset && !in_menu_command;
+  keypad_text_preset = false;
+  if (!preset_text)
+    kp_buf[0] = 0;
   if (in_menu_command) return;
+  if (preset_text) {                          // show the default, ENTER accepts it as is
+    if (keypads[0].c == NUM_KEYBOARD)
+      draw_numeric_input(kp_buf);
+    else
+      draw_text_input(kp_buf);
+  }
   while (TRUE) {
     status = btn_check();
     if (status & (EVT_UP|EVT_DOWN)) {
@@ -8025,6 +8060,17 @@ static void sa_save_file(uint8_t format) {
 #endif
   }
   else {
+#ifdef __SD_FILE_BROWSER__
+    // Storing a preset: offer the SD preset it was loaded from as default name,
+    // so a single ENTER writes back to that same file
+    if (format == FMT_PRS_FILE && sd_preset_path[0]) {
+      int len = strlen(sd_preset_path);
+      int ext = strlen(file_ext[format]) + 1;             // ".prs"
+      if (len > ext && sd_preset_path[len - ext] == '.')  // keypad adds the extension back
+        len -= ext;
+      ui_preset_keypad_text(sd_preset_path, len);
+    }
+#endif
     ui_mode_keypad(KM_FILENAME);
     if (kp_buf[0] == 0) return;
     plot_printf(fs_filename, FF_LFN_BUF, "%s.%s", kp_buf, file_ext[format]);

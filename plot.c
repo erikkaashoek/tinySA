@@ -394,6 +394,8 @@ value(const float v)
     return v + (30.0 + 20.0*log10f(sqrtf(50.0)));
   case U_DBUV:
     return v + (90.0 + 20.0*log10f(sqrtf(50.0)));
+  case U_DBV:
+    return v + (-30.0 + 20.0*log10f(sqrtf(50.0)));
   case U_VOLT:
 //  return powf(10.0, (v-30.0)/20.0) * sqrtf(50.0);                     // powf(10.0, v           /20.0) * powf(10, -30.0/20.0) * sqrtf(50)
     return expf(v*(logf(10.0)/20.0)) * (powf(10, -30.0/20.0)*sqrtf(50));//       expf(v*logf(10.0)/20.0) * powf(10, -30.0/20.0) * sqrtf(50)
@@ -418,6 +420,8 @@ to_dBm(const float v)
     return v - (30.0 + 20.0*log10f(sqrtf(50.0)));
   case U_DBUV:
     return v - (90.0 + 20.0*log10f(sqrtf(50.0)));
+  case U_DBV:
+    return v - (-30.0 + 20.0*log10f(sqrtf(50.0)));
   case U_VOLT:
 //  return log10f(v/(sqrtf(50.0)))* 20.0             + 30.0;
     return   logf(v/(sqrtf(50.0)))*(20.0/logf(10.0)) + 30.0;
@@ -485,6 +489,7 @@ trace_into_index_y_array(index_y_t *y, float *array, int points)
 #endif
     case U_DBMV: ref_shift = 30.0 + 20.0*log10f(sqrtf(50.0));break;
     case U_DBUV: ref_shift = 90.0 + 20.0*log10f(sqrtf(50.0));break;
+    case U_DBV:  ref_shift = -30.0 + 20.0*log10f(sqrtf(50.0));break;
     case U_VOLT: vmult = powf(10, -30.0/20.0) * sqrtf(50.0); mult = logf(10.0)/20.0;break;
     case U_VPP:  vmult = 2.828* powf(10, -30.0/20.0) * sqrtf(50.0); mult = logf(10.0)/20.0;break;
     case U_WATT: vmult = 1.0/1000.0;                         mult = logf(10.0)/10.0;break;

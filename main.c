@@ -1986,10 +1986,10 @@ show_one:
     do_one = true;
     goto show_one;
   }
-#if MAX_UNIT_TYPE != 7
+#if MAX_UNIT_TYPE != 8
 #error "Unit type enum possibly changed, check cmd_trace function"
 #endif
-  static const char cmd_type_list[] = "dBm|dBmV|dBuV|RAW|V|Vpp|W";
+  static const char cmd_type_list[] = "dBm|dBmV|dBuV|RAW|V|Vpp|W|dBV";
   if (argc == 1) {
     int type = get_str_index(argv[0], cmd_type_list);
     if (type >= 0) {
