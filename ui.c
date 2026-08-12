@@ -106,6 +106,9 @@ void ui_set_keypad_text(const char *text)
 // of an empty buffer, so a single ENTER accepts it unchanged
 static bool keypad_text_preset = false;
 
+// Set while handling a keypad key that was held down longer than a short tap
+static bool keypad_long_press = false;
+
 #ifdef __SD_FILE_BROWSER__
 // Preset the keypad input with the first len characters of text
 static void ui_preset_keypad_text(const char *text, int len)
@@ -7821,7 +7824,10 @@ full_keypad_click(int c, int kp_index)
   if (c == S_LARROW[0]) { // Backspace
     if (kp_index == 0)
       return KP_CANCEL;
-    --kp_index;
+    if (keypad_long_press)          // long press erases the whole input, stay in the keypad
+      kp_index = 0;
+    else
+      --kp_index;
   } else if (kp_index < TXTINPUT_LEN) { // any other text input
     kp_buf[kp_index++] = c;
   }
@@ -7854,7 +7860,9 @@ keypad_apply_touch(void)
     int old = selection;
     draw_keypad_button(selection = i);  // draw new focus
     draw_keypad_button(old);            // Erase old focus
+    systime_t ticks = chVTGetSystemTimeX();
     touch_wait_release();
+    keypad_long_press = (chVTGetSystemTimeX() - ticks) >= BUTTON_DOWN_LONG_TICKS;
     selection = -1;
     draw_keypad_button(i);              // erase new focus
     return i;                           // Process input;
@@ -7874,6 +7882,7 @@ ui_process_keypad(void)
   // invoke must not silently accept it
   bool preset_text = keypad_text_preset && !in_menu_command;
   keypad_text_preset = false;
+  keypad_long_press = false;
   if (!preset_text)
     kp_buf[0] = 0;
   if (in_menu_command) return;
@@ -7899,6 +7908,7 @@ ui_process_keypad(void)
     }
 
     if (status == EVT_BUTTON_SINGLE_CLICK) {
+      keypad_long_press = false;        // lever click is never a long press
       if (selection >= 0 && keypad_click(selection))
         /* exit loop on done or cancel */
         break;
