@@ -3,11 +3,12 @@
 # NOTE: Can be overridden externally.
 #
 
-#Build target
-ifeq ($(TARGET),)
-  TARGET = F072
-else
-  TARGET = F303
+# Build target.
+TARGET ?= F072
+ifneq ($(TARGET),F072)
+  ifneq ($(TARGET),F303)
+    $(error Unsupported TARGET '$(TARGET)'; expected F072 or F303)
+  endif
 endif
 
 # Compiler options here.
