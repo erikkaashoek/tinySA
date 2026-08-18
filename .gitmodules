@@ -1,4 +1,4 @@
 [submodule "ChibiOS"]
 	path = ChibiOS
-	url = https://github.com/edy555/ChibiOS.git
-	branch = I2SFULLDUPLEX
+	url = https://github.com/PhysicistJohn/chibios.git
+	branch = codex/integration-tinysa-21.11.5

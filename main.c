@@ -210,7 +210,7 @@ static THD_FUNCTION(Thread1, arg)
       {
         completed = sweep(true);
 #ifdef __USE_SD_CARD__
-        if (setting.trigger_auto_save && (last_auto_save == 0 ||  chVTGetSystemTimeX() - last_auto_save > S2ST(30)) ) { // once every 30 seconds max
+        if (setting.trigger_auto_save && (last_auto_save == 0 ||  chVTGetSystemTimeX() - last_auto_save > TIME_S2I(30)) ) { // once every 30 seconds max
           uint16_t old_mode = config._mode;
           config._mode |= _MODE_AUTO_FILENAME;
           save_csv(1+(2<<0));      // frequencies + trace 1
@@ -456,7 +456,7 @@ VNA_SHELL_FUNCTION(cmd_restart)
   (void)argc;
   (void)argv;
   if (argc == 1) {
-    restart_interval = S2ST(my_atoi(argv[0]));
+    restart_interval = TIME_S2I(my_atoi(argv[0]));
     if (restart_interval) {
       restart_set_time =  chVTGetSystemTimeX();
       if (restart_set_time == 0)
@@ -2429,7 +2429,7 @@ VNA_SHELL_FUNCTION(cmd_threads)
 #endif
     shell_printf("%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s"VNA_SHELL_NEWLINE_STR,
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
+             (uint32_t)tp->refs - 1, (uint32_t)tp->hdr.pqueue.prio, states[tp->state],
              tp->name == NULL ? "" : tp->name);
     tp = chRegNextThread(tp);
   } while (tp != NULL);
@@ -2708,18 +2708,21 @@ void shell_update_speed(void){
 }
 
 void shell_reset_console(void){
+  osalSysLock();
   // Reset I/O queue over USB (for USB need also connect/disconnect)
   if (usb_IsActive()){
     if (config._mode & _MODE_SERIAL)
-      sduDisconnectI(&SDU1);
+      sduSuspendHookI(&SDU1);
     else
       sduConfigureHookI(&SDU1);
   }
   // Reset I/O queue over Serial
 //  oqResetI(&SD1.oqueue);
 //  iqResetI(&SD1.iqueue);
-  qResetI(&SD1.oqueue);
-  qResetI(&SD1.iqueue);
+  oqResetI(&SD1.oqueue);
+  iqResetI(&SD1.iqueue);
+  osalOsRescheduleS();
+  osalSysUnlock();
 
 }
 
@@ -2901,7 +2904,7 @@ static void VNAShell_executeLine(char *line)
         int timeout_count = 0;
         msg_t result;
         do {
-          result = osalThreadEnqueueTimeoutS(&shell_thread, MS2ST(5000));  // 5 second timeout
+          result = osalThreadEnqueueTimeoutS(&shell_thread, TIME_MS2I(5000));  // 5 second timeout
           if (result == MSG_TIMEOUT) {
             timeout_count++;
             if (timeout_count > 3) {
@@ -3018,6 +3021,7 @@ static PWMConfig pwmcfg = {
    {PWM_OUTPUT_DISABLED, NULL},
    {PWM_OUTPUT_DISABLED, NULL}
   },
+  0,
   0,
   0
 };
@@ -3461,8 +3465,35 @@ int main(void)
   }
 }
 
-/* The prototype shows it is a naked function - in effect this is just an
-assembly function. */
+#ifdef TINYSA4
+void hard_fault_handler_c(uint32_t *sp, const uint32_t *callee)
+    __attribute__((noreturn, noinline));
+void HardFault_Handler(void) __attribute__((naked));
+
+void HardFault_Handler(void)
+{
+  __asm volatile(
+      "tst lr, #4\n"
+      "ite eq\n"
+      "mrseq r0, msp\n"
+      "mrsne r0, psp\n"
+      "sub sp, sp, #32\n"
+      "str r4, [sp, #0]\n"
+      "str r5, [sp, #4]\n"
+      "str r6, [sp, #8]\n"
+      "str r7, [sp, #12]\n"
+      "mov r2, r8\n"
+      "str r2, [sp, #16]\n"
+      "mov r2, r9\n"
+      "str r2, [sp, #20]\n"
+      "mov r2, r10\n"
+      "str r2, [sp, #24]\n"
+      "mov r2, r11\n"
+      "str r2, [sp, #28]\n"
+      "mov r1, sp\n"
+      "b hard_fault_handler_c\n");
+}
+#else
 void HardFault_Handler(void);
 
 void hard_fault_handler_c(uint32_t *sp) __attribute__((naked));
@@ -3475,22 +3506,27 @@ void HardFault_Handler(void)
   __asm volatile("mrs %0, psp \n\t" : "=r"(sp));
   hard_fault_handler_c(sp);
 }
+#endif
 
+#ifdef TINYSA4
+void hard_fault_handler_c(uint32_t *sp, const uint32_t *callee)
+#else
 void hard_fault_handler_c(uint32_t *sp)
+#endif
 {
 #ifdef TINYSA4
   uint32_t r0  = sp[0];
   uint32_t r1  = sp[1];
   uint32_t r2  = sp[2];
   uint32_t r3  = sp[3];
-  register uint32_t  r4 __asm("r4");
-  register uint32_t  r5 __asm("r5");
-  register uint32_t  r6 __asm("r6");
-  register uint32_t  r7 __asm("r7");
-  register uint32_t  r8 __asm("r8");
-  register uint32_t  r9 __asm("r9");
-  register uint32_t r10 __asm("r10");
-  register uint32_t r11 __asm("r11");
+  uint32_t r4  = callee[0];
+  uint32_t r5  = callee[1];
+  uint32_t r6  = callee[2];
+  uint32_t r7  = callee[3];
+  uint32_t r8  = callee[4];
+  uint32_t r9  = callee[5];
+  uint32_t r10 = callee[6];
+  uint32_t r11 = callee[7];
   uint32_t r12 = sp[4];
   uint32_t lr  = sp[5];
   uint32_t pc  = sp[6];
@@ -3531,7 +3567,7 @@ void hard_fault_handler_c(uint32_t *sp)
 #endif
     lcd_printf(x, y+=FONT_STR_HEIGHT, "%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s",
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
+             (uint32_t)tp->refs - 1, (uint32_t)tp->hdr.pqueue.prio, states[tp->state],
              tp->name == NULL ? "" : tp->name);
     tp = chRegNextThread(tp);
   } while (tp != NULL);
@@ -3546,6 +3582,5 @@ void hard_fault_handler_c(uint32_t *sp)
   while (true) {
   }
 }
-
 
 

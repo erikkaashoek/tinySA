@@ -444,7 +444,7 @@ void adc_lld_init(void) {
 #if STM32_ADC_DUAL_MODE
   ADCD1.adcs    = ADC2;
 #endif
-  ADCD1.dmastp  = STM32_DMA_STREAM(STM32_ADC_ADC1_DMA_STREAM);
+  ADCD1.dmastp  = NULL;
   ADCD1.dmamode = ADC_DMA_SIZE |
                   STM32_DMA_CR_PL(STM32_ADC_ADC1_DMA_PRIORITY) |
                   STM32_DMA_CR_DIR_P2M |
@@ -461,7 +461,7 @@ void adc_lld_init(void) {
   ADCD2.adcc = ADC123_COMMON;
 #endif
   ADCD2.adcm    = ADC2;
-  ADCD2.dmastp  = STM32_DMA_STREAM(STM32_ADC_ADC2_DMA_STREAM);
+  ADCD2.dmastp  = NULL;
   ADCD2.dmamode = ADC_DMA_SIZE |
                   STM32_DMA_CR_PL(STM32_ADC_ADC2_DMA_PRIORITY) |
                   STM32_DMA_CR_DIR_P2M |
@@ -483,7 +483,7 @@ void adc_lld_init(void) {
 #if STM32_ADC_DUAL_MODE
   ADCD3.adcs    = ADC4;
 #endif
-  ADCD3.dmastp  = STM32_DMA_STREAM(STM32_ADC_ADC3_DMA_STREAM);
+  ADCD3.dmastp  = NULL;
   ADCD3.dmamode = ADC_DMA_SIZE |
                   STM32_DMA_CR_PL(STM32_ADC_ADC3_DMA_PRIORITY) |
                   STM32_DMA_CR_DIR_P2M |
@@ -496,7 +496,7 @@ void adc_lld_init(void) {
   adcObjectInit(&ADCD4);
   ADCD4.adcc = ADC3_4_COMMON;
   ADCD4.adcm    = ADC4;
-  ADCD4.dmastp  = STM32_DMA_STREAM(STM32_ADC_ADC4_DMA_STREAM);
+  ADCD4.dmastp  = NULL;
   ADCD4.dmamode = ADC_DMA_SIZE |
                   STM32_DMA_CR_PL(STM32_ADC_ADC4_DMA_PRIORITY) |
                   STM32_DMA_CR_DIR_P2M |
@@ -524,13 +524,13 @@ void adc_lld_init(void) {
   rccEnableADC12(FALSE);
   rccResetADC12();
   ADC1_2_COMMON->CCR = STM32_ADC_ADC12_CLOCK_MODE | ADC_DMA_MDMA;
-  rccDisableADC12(FALSE);
+  rccDisableADC12();
 #endif
 #if STM32_ADC_USE_ADC3 || STM32_ADC_USE_ADC4
   rccEnableADC34(FALSE);
   rccResetADC34();
   ADC3_4_COMMON->CCR = STM32_ADC_ADC34_CLOCK_MODE | ADC_DMA_MDMA;
-  rccDisableADC34(FALSE);
+  rccDisableADC34();
 #endif
 #endif
 
@@ -538,7 +538,7 @@ void adc_lld_init(void) {
   rccEnableADC123(FALSE);
   rccResetADC123();
   ADC123_COMMON->CCR = STM32_ADC_ADC123_CLOCK_MODE | ADC_DMA_MDMA;
-  rccDisableADC123(FALSE);
+  rccDisableADC123();
 #endif
 }
 
@@ -560,12 +560,11 @@ void adc_lld_start(ADCDriver *adcp) {
   if (adcp->state == ADC_STOP) {
 #if STM32_ADC_USE_ADC1
     if (&ADCD1 == adcp) {
-      bool b;
-      b = dmaStreamAllocate(adcp->dmastp,
-                            STM32_ADC_ADC1_DMA_IRQ_PRIORITY,
-                            (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
-                            (void *)adcp);
-      osalDbgAssert(!b, "stream already allocated");
+      adcp->dmastp = dmaStreamAllocI(STM32_ADC_ADC1_DMA_STREAM,
+                                     STM32_ADC_ADC1_DMA_IRQ_PRIORITY,
+                                     (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
+                                     (void *)adcp);
+      osalDbgAssert(adcp->dmastp != NULL, "unable to allocate stream");
 
       clkmask |= (1 << 0);
 #if defined(STM32F3XX)
@@ -579,12 +578,11 @@ void adc_lld_start(ADCDriver *adcp) {
 
 #if STM32_ADC_USE_ADC2
     if (&ADCD2 == adcp) {
-      bool b;
-      b = dmaStreamAllocate(adcp->dmastp,
-                            STM32_ADC_ADC2_DMA_IRQ_PRIORITY,
-                            (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
-                            (void *)adcp);
-      osalDbgAssert(!b, "stream already allocated");
+      adcp->dmastp = dmaStreamAllocI(STM32_ADC_ADC2_DMA_STREAM,
+                                     STM32_ADC_ADC2_DMA_IRQ_PRIORITY,
+                                     (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
+                                     (void *)adcp);
+      osalDbgAssert(adcp->dmastp != NULL, "unable to allocate stream");
 
       clkmask |= (1 << 1);
 #if defined(STM32F3XX)
@@ -598,12 +596,11 @@ void adc_lld_start(ADCDriver *adcp) {
 
 #if STM32_ADC_USE_ADC3
     if (&ADCD3 == adcp) {
-      bool b;
-      b = dmaStreamAllocate(adcp->dmastp,
-                            STM32_ADC_ADC3_DMA_IRQ_PRIORITY,
-                            (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
-                            (void *)adcp);
-      osalDbgAssert(!b, "stream already allocated");
+      adcp->dmastp = dmaStreamAllocI(STM32_ADC_ADC3_DMA_STREAM,
+                                     STM32_ADC_ADC3_DMA_IRQ_PRIORITY,
+                                     (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
+                                     (void *)adcp);
+      osalDbgAssert(adcp->dmastp != NULL, "unable to allocate stream");
 
       clkmask |= (1 << 2);
 #if defined(STM32F3XX)
@@ -617,12 +614,11 @@ void adc_lld_start(ADCDriver *adcp) {
 
 #if STM32_ADC_USE_ADC4
     if (&ADCD4 == adcp) {
-      bool b;
-      b = dmaStreamAllocate(adcp->dmastp,
-                            STM32_ADC_ADC4_DMA_IRQ_PRIORITY,
-                            (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
-                            (void *)adcp);
-      osalDbgAssert(!b, "stream already allocated");
+      adcp->dmastp = dmaStreamAllocI(STM32_ADC_ADC4_DMA_STREAM,
+                                     STM32_ADC_ADC4_DMA_IRQ_PRIORITY,
+                                     (stm32_dmaisr_t)adc_lld_serve_dma_interrupt,
+                                     (void *)adcp);
+      osalDbgAssert(adcp->dmastp != NULL, "unable to allocate stream");
 
       clkmask |= (1 << 3);
 #if defined(STM32F3XX)
@@ -671,7 +667,8 @@ void adc_lld_stop(ADCDriver *adcp) {
   if (adcp->state == ADC_READY) {
 
     /* Releasing the associated DMA channel.*/
-    dmaStreamRelease(adcp->dmastp);
+    dmaStreamFreeI(adcp->dmastp);
+    adcp->dmastp = NULL;
 
     /* Stopping the ongoing conversion, if any.*/
     adc_lld_stop_adc(adcp);
@@ -727,16 +724,16 @@ void adc_lld_stop(ADCDriver *adcp) {
 
 #if defined(STM32F3XX)
     if ((clkmask & 0x3) == 0) {
-      rccDisableADC12(FALSE);
+      rccDisableADC12();
     }
     if ((clkmask & 0xC) == 0) {
-      rccDisableADC34(FALSE);
+      rccDisableADC34();
     }
 #endif
 
 #if defined(STM32L4XX)
     if ((clkmask & 0x7) == 0) {
-      rccDisableADC123(FALSE);
+      rccDisableADC123();
     }
 #endif
   }

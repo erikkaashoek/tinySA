@@ -299,6 +299,8 @@ static const USBEndpointConfig ep1config = {
   0x0040,
   &ep1instate,
   &ep1outstate,
+  1,
+  NULL
 };
 
 /**
@@ -318,6 +320,8 @@ static const USBEndpointConfig ep2config = {
   0x0000,
   &ep2instate,
   NULL,
+  1,
+  NULL
 };
 
 /*
@@ -327,8 +331,6 @@ static void usb_event(USBDriver *usbp, usbevent_t event) {
   extern SerialUSBDriver SDU1;
 
   switch (event) {
-  case USB_EVENT_RESET:
-    return;
   case USB_EVENT_ADDRESS:
     return;
   case USB_EVENT_CONFIGURED:
@@ -345,15 +347,20 @@ static void usb_event(USBDriver *usbp, usbevent_t event) {
 
     chSysUnlockFromISR();
     return;
+  case USB_EVENT_RESET:
+  case USB_EVENT_UNCONFIGURED:
   case USB_EVENT_SUSPEND:
     chSysLockFromISR();
 
     /* Disconnection event on suspend.*/
-    sduDisconnectI(&SDU1);
+    sduSuspendHookI(&SDU1);
 
     chSysUnlockFromISR();
     return;
   case USB_EVENT_WAKEUP:
+    chSysLockFromISR();
+    sduWakeupHookI(&SDU1);
+    chSysUnlockFromISR();
     return;
   case USB_EVENT_STALLED:
     return;
