@@ -13,7 +13,9 @@ endif
 # Compiler options here.
 ifeq ($(USE_OPT),)
  ifeq ($(TARGET),F303)
-USE_OPT = -Og -fno-inline-small-functions -ggdb -fomit-frame-pointer -falign-functions=16 --specs=nano.specs -fstack-usage -std=c11
+USE_OPT = -Og -fno-inline-small-functions -ggdb -fomit-frame-pointer -falign-functions=16 --specs=nano.specs -fstack-usage -fsingle-precision-constant -std=c11
+# The legacy ChibiOS rules appended -fsingle-precision-constant for hard-FPU
+# builds. Keep that numeric behavior explicit when using the 21.11.x rules.
 #USE_OPT+=-fstack-protector-strong
  else
 USE_OPT = -Og -fno-inline-small-functions -ggdb -fomit-frame-pointer -falign-functions=16 --specs=nano.specs -fstack-usage -fsingle-precision-constant 
@@ -106,7 +108,9 @@ endif
 ifeq ($(TARGET),F303)
   USE_FPU = hard
   USE_PROCESS_STACKSIZE = 0x480
-  USE_EXCEPTIONS_STACKSIZE = 0x200
+  # The fault reporter renders through the LCD/printf stack. Reserve room for
+  # its assembly veneer, an extended exception frame, and a nested ISR frame.
+  USE_EXCEPTIONS_STACKSIZE = 0x400
 endif
 
 #
@@ -128,6 +132,8 @@ endif
 #CHIBIOS = ../ChibiOS-RT
 CHIBIOS = ChibiOS
 PROJ = .
+# ChibiOS 21.11.x keeps its license policy header in a dedicated include.
+include $(CHIBIOS)/os/license/license.mk
 # Startup files.
 
 ifeq ($(TARGET),F303)
@@ -143,13 +149,13 @@ include $(CHIBIOS)/os/hal/ports/STM32/STM32F0xx/platform.mk
 include NANOVNA_STM32_F072/board.mk
 endif
 
-include $(CHIBIOS)/os/hal/osal/rt/osal.mk
+include $(CHIBIOS)/os/hal/osal/rt-nil/osal.mk
 # RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
 ifeq ($(TARGET),F303)
-include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
+include $(CHIBIOS)/os/common/ports/ARMv7-M/compilers/GCC/mk/port.mk
 else
-include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v6m.mk
+include $(CHIBIOS)/os/common/ports/ARMv6-M/compilers/GCC/mk/port.mk
 endif
 # Other files (optional).
 #include $(CHIBIOS)/test/rt/test.mk
@@ -169,6 +175,7 @@ endif
 ifeq ($(TARGET),F303)
 CSRC = $(STARTUPSRC) \
        $(KERNSRC) \
+       $(OSLIBSRC) \
        $(PORTSRC) \
        $(OSALSRC) \
        $(HALSRC) \
@@ -183,6 +190,7 @@ CSRC = $(STARTUPSRC) \
 else
 CSRC = $(STARTUPSRC) \
        $(KERNSRC) \
+       $(OSLIBSRC) \
        $(PORTSRC) \
        $(OSALSRC) \
        $(HALSRC) \
@@ -218,10 +226,11 @@ TCSRC =
 #       option that results in lower performance and larger code size.
 TCPPSRC =
 
-# List ASM source files here
-ASMSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
+# ChibiOS startup and port assembly is preprocessed (.S), not plain assembly.
+ASMSRC =
+ASMXSRC = $(STARTUPASM) $(PORTASM) $(OSALASM)
 
-INCDIR = $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
+INCDIR = $(LICINC) $(STARTUPINC) $(KERNINC) $(OSLIBINC) $(PORTINC) $(OSALINC) \
          $(HALINC) $(PLATFORMINC) $(BOARDINC)  \
          $(STREAMSINC)
 
@@ -279,7 +288,7 @@ CPPWARN = -Wall -Wextra -Wundef
 
 # List all user C define here, like -D_DEBUG=1
 ifeq ($(TARGET),F303)
- UDEFS = -DARM_MATH_CM4 -DVERSION=\"$(VERSION)\" -DTINYSA_F303 -D__FPU_USED -DST7796S -DTINYSA4
+ UDEFS = -DARM_MATH_CM4 -DVERSION=\"$(VERSION)\" -DTINYSA_F303 -DST7796S -DTINYSA4
 #Enable if install external 32.768kHz clock quartz on PC14 and PC15 pins on STM32 CPU
 UDEFS+= -DVNA_USE_LSE
 # Use R as usb pullup
@@ -305,20 +314,13 @@ ULIBS = -lm
 # End of user defines
 ##############################################################################
 
-RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC
+RULESPATH = $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk
+include $(RULESPATH)/arm-none-eabi.mk
 include $(RULESPATH)/rules.mk
 #include $(CHIBIOS)/memory.mk
 
 $(OBJS): $(VERSION_FILE)
 
-
-ifeq ($(TARGET),F303)
-clean:
-	rm -f -rf build/tinySA4.* build/lst/*.* build/obj/*.*
-else
-clean:
-	rm -f -rf build/$(PROJECT).* build/lst/*.* build/obj/*.*
-endif
 
 flash: build/$(PROJECT).bin
 	-@printf "reset dfu\r" >/dev/cu.usbmodem401 # mac
@@ -338,4 +340,3 @@ else
 	@etags *.[ch] NANOVNA_STM32_F072/*.[ch] $(shell find ChibiOS/os/hal/ports/STM32/STM32F0xx ChibiOS/os -name \*.\[ch\] -print) 
 endif
 	@ls -l TAGS
-

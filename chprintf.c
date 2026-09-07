@@ -630,7 +630,13 @@ static msg_t put(void *ip, uint8_t b) {
   return MSG_OK;
 }
 
-static const struct printStreamVMT vmt = {NULL, NULL, put, NULL};
+static const struct printStreamVMT vmt = {
+  .instance_offset = 0U,
+  .write = NULL,
+  .read = NULL,
+  .put = put,
+  .get = NULL
+};
 void printObjectInit(printStream *ps, int size, uint8_t *buffer){
   ps->vmt    = &vmt;
   ps->buffer = buffer;

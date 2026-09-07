@@ -27,8 +27,6 @@
 #define BOARD_NANOVNA_STM32_F303
 #define BOARD_NAME              "tinySA ULTRA"
 
-#include <stm32f303xc.h>
-//#include "..\nanovna.h"
 /*
  * Board frequencies.
  */

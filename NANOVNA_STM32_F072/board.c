@@ -15,14 +15,40 @@
 */
 
 #include "hal.h"
+#include "stm32_gpio.h"
 
-#if HAL_USE_PAL || defined(__DOXYGEN__)
-/**
- * @brief   PAL setup.
- * @details Digital I/O ports static configuration as defined in @p board.h.
- *          This variable is used by the HAL when initializing the PAL driver.
- */
-const PALConfig pal_default_config = {
+typedef struct {
+  uint32_t moder;
+  uint32_t otyper;
+  uint32_t ospeedr;
+  uint32_t pupdr;
+  uint32_t odr;
+  uint32_t afrl;
+  uint32_t afrh;
+} gpio_setup_t;
+
+typedef struct {
+#if STM32_HAS_GPIOA
+  gpio_setup_t PAData;
+#endif
+#if STM32_HAS_GPIOB
+  gpio_setup_t PBData;
+#endif
+#if STM32_HAS_GPIOC
+  gpio_setup_t PCData;
+#endif
+#if STM32_HAS_GPIOD
+  gpio_setup_t PDData;
+#endif
+#if STM32_HAS_GPIOE
+  gpio_setup_t PEData;
+#endif
+#if STM32_HAS_GPIOF
+  gpio_setup_t PFData;
+#endif
+} gpio_config_t;
+
+static const gpio_config_t gpio_default_config = {
 #if STM32_HAS_GPIOA
   {VAL_GPIOA_MODER, VAL_GPIOA_OTYPER, VAL_GPIOA_OSPEEDR, VAL_GPIOA_PUPDR,
    VAL_GPIOA_ODR,   VAL_GPIOA_AFRL,   VAL_GPIOA_AFRH},
@@ -60,7 +86,39 @@ const PALConfig pal_default_config = {
    VAL_GPIOI_ODR,   VAL_GPIOI_AFRL,   VAL_GPIOI_AFRH}
 #endif
 };
+
+static void gpio_init(stm32_gpio_t *gpiop, const gpio_setup_t *config) {
+  gpiop->OTYPER  = config->otyper;
+  gpiop->OSPEEDR = config->ospeedr;
+  gpiop->PUPDR   = config->pupdr;
+  gpiop->ODR     = config->odr;
+  gpiop->AFRL    = config->afrl;
+  gpiop->AFRH    = config->afrh;
+  gpiop->MODER   = config->moder;
+}
+
+static void stm32_gpio_init(void) {
+  rccResetAHB(STM32_GPIO_EN_MASK);
+  rccEnableAHB(STM32_GPIO_EN_MASK, true);
+#if STM32_HAS_GPIOA
+  gpio_init(GPIOA, &gpio_default_config.PAData);
 #endif
+#if STM32_HAS_GPIOB
+  gpio_init(GPIOB, &gpio_default_config.PBData);
+#endif
+#if STM32_HAS_GPIOC
+  gpio_init(GPIOC, &gpio_default_config.PCData);
+#endif
+#if STM32_HAS_GPIOD
+  gpio_init(GPIOD, &gpio_default_config.PDData);
+#endif
+#if STM32_HAS_GPIOE
+  gpio_init(GPIOE, &gpio_default_config.PEData);
+#endif
+#if STM32_HAS_GPIOF
+  gpio_init(GPIOF, &gpio_default_config.PFData);
+#endif
+}
 
 static bool needDFU(void) {
   // Magick data in memory before reset
@@ -105,6 +163,7 @@ void __early_init(void) {
   }
 
   //si5351_setup();
+  stm32_gpio_init();
   stm32_clock_init();
 }
 
