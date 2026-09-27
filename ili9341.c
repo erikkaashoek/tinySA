@@ -1226,6 +1226,10 @@ bool SD_Inserted(void){
   return !(palReadPort(GPIOB)&(1<<GPIOB_SD_CD));
 }
 
+bool SD_BlockAddressing(void){
+  return (CardType & CT_BLOCK) != 0;
+}
+
 static void SD_Select_SPI(void) {
   set_SPI_mode(SPI_MODE_SD_CARD);
   SD_CS_LOW;                 // Select SD Card

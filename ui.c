@@ -4347,7 +4347,7 @@ static uint16_t file_mask;
 // Save format enum
 enum {
   FMT_BMP_FILE, FMT_CSV_FILE,
-#ifdef __SD_CARD_DUMP_FIRMWARE__
+#if defined(__SD_CARD_DUMP_FIRMWARE__) || defined(__SD_FIRMWARE_UPDATE__)
   FMT_BIN_FILE,
 #endif
   FMT_CMD_FILE,
@@ -4363,7 +4363,7 @@ enum {
 static const char *file_ext[] = {
   [FMT_BMP_FILE] = "bmp",
   [FMT_CSV_FILE] = "csv",
-#ifdef __SD_CARD_DUMP_FIRMWARE__
+#if defined(__SD_CARD_DUMP_FIRMWARE__) || defined(__SD_FIRMWARE_UPDATE__)
   [FMT_BIN_FILE] = "bin",
 #endif
   [FMT_CMD_FILE] = "cmd",
@@ -4474,6 +4474,95 @@ static UI_FUNCTION_CALLBACK(menu_usb_disk_cb) {
   (void)item;
   (void)data;
   usb_disk_mode();
+}
+#endif
+
+#ifdef __SD_FIRMWARE_UPDATE__
+// Firmware update from the SD card (fw_update.c), started from the file browser on a .bin file
+#define FWU_DLG_W   420
+#define FWU_DLG_H   160
+#define FWU_DLG_X   ((LCD_WIDTH  - FWU_DLG_W) / 2)
+#define FWU_DLG_Y   ((LCD_HEIGHT - FWU_DLG_H) / 2)
+#define FWU_BTN_W   120
+#define FWU_BTN_H   36
+#define FWU_BTN_Y   (FWU_DLG_Y + FWU_DLG_H - FWU_BTN_H - 10)
+#define FWU_BTN_X(i) ((i) == 0 ? FWU_DLG_X + 30 : FWU_DLG_X + FWU_DLG_W - 30 - FWU_BTN_W)
+
+static void fw_update_draw_button(int i, bool selected) {
+  ui_button_t b;
+  b.bg = selected ? LCD_MENU_ACTIVE_COLOR : LCD_MENU_COLOR;
+  b.fg = LCD_MENU_TEXT_COLOR;
+  b.border = (selected ? BUTTON_BORDER_FALLING : BUTTON_BORDER_RISE) | 2;
+  draw_button(FWU_BTN_X(i), FWU_BTN_Y, FWU_BTN_W, FWU_BTN_H, &b);
+  ili9341_drawstring_7x13(i == 0 ? "UPDATE" : "CANCEL", FWU_BTN_X(i) + (FWU_BTN_W - 6 * bFONT_WIDTH) / 2,
+                          FWU_BTN_Y + (FWU_BTN_H - bFONT_STR_HEIGHT) / 2);
+}
+
+// Show both versions and ask. Jog up/down selects, jog push or touch confirms. CANCEL is the default.
+static bool fw_update_confirm(const fw_header_t *hdr) {
+  char line[64];
+  ui_button_t b;
+  b.bg = LCD_MENU_COLOR;
+  b.fg = LCD_MENU_TEXT_COLOR;
+  b.border = BUTTON_BORDER_FLAT | 1;
+  draw_button(FWU_DLG_X, FWU_DLG_Y, FWU_DLG_W, FWU_DLG_H, &b);
+  int x = FWU_DLG_X + 10, y = FWU_DLG_Y + 8;
+  ili9341_drawstring_7x13("UPDATE FIRMWARE?", x, y);
+  y += bFONT_STR_HEIGHT + 10;
+  plot_printf(line, sizeof line, "Installed: %s", fw_header.version);
+  ili9341_drawstring_7x13(line, x, y);
+  y += bFONT_STR_HEIGHT + 4;
+  plot_printf(line, sizeof line, "New:       %s", hdr->version);
+  ili9341_drawstring_7x13(line, x, y);
+  y += bFONT_STR_HEIGHT + 4;
+  ili9341_drawstring_7x13("Settings, calibration and presets are kept.", x, y);
+  int sel = 1;
+  fw_update_draw_button(0, false);
+  fw_update_draw_button(1, true);
+  touch_wait_release();
+  systime_t start = chVTGetSystemTimeX();
+  while (chVTGetSystemTimeX() - start < MS2ST(30000)) {
+    int status = btn_check();
+    if (status & EVT_BUTTON_SINGLE_CLICK)
+      return sel == 0;
+    if (status & (EVT_UP | EVT_DOWN)) {
+      sel ^= 1;
+      fw_update_draw_button(0, sel == 0);
+      fw_update_draw_button(1, sel == 1);
+    }
+    if (touch_check() == EVT_TOUCH_PRESSED) {
+      int tx, ty;
+      touch_position(&tx, &ty);
+      touch_wait_release();
+      for (int i = 0; i < 2; i++)
+        if (tx >= FWU_BTN_X(i) && tx < FWU_BTN_X(i) + FWU_BTN_W && ty >= FWU_BTN_Y && ty < FWU_BTN_Y + FWU_BTN_H)
+          return i == 0;
+    }
+    chThdSleepMilliseconds(40);
+  }
+  return false;
+}
+
+// Check the file, ask, check the image and update. Returns only on cancel or error.
+static void fw_update_ui(const char *fname) {
+  fw_header_t hdr;
+  int err = fwu_begin();
+  if (err == FWU_OK)
+    err = fwu_read_header(fname, &hdr);
+  if (err == FWU_OK) {
+    if (!fw_update_confirm(&hdr)) {
+      fwu_end();
+      return;
+    }
+    drawMessageBox("FIRMWARE UPDATE", "Checking file...", 0);
+    err = fwu_prepare(fname, &hdr);
+  }
+  if (err == FWU_OK) {
+    fwu_draw_screen(&hdr);
+    fwu_start();
+  }
+  fwu_end();
+  drawMessageBox("FIRMWARE UPDATE", (char *)fwu_error_text(err), 3000);
 }
 #endif
 
@@ -5520,6 +5609,9 @@ static const menuitem_t menu_storage[] = {
   { MT_CALLBACK,    FMT_CSV_FILE,   "SAVE\nTRACES",         menu_save_traces_cb},
 #ifdef __USE_USB_MSC__
   { MT_CALLBACK,    0,              "USB\nDISK",            menu_usb_disk_cb},
+#endif
+#ifdef __SD_FIRMWARE_UPDATE__
+  { MT_CALLBACK,    FMT_BIN_FILE,   "UPDATE\nFIRMWARE",     menu_sdcard_browse_cb},
 #endif
   { MT_SUBMENU,     0,              "CONFIG",               menu_storage_config },
 //  { MT_KEYPAD,      KM_INTERVAL,    "INTERVAL\n\b%s",       NULL },

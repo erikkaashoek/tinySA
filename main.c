@@ -1165,6 +1165,45 @@ VNA_SHELL_FUNCTION(cmd_usbdisk)
 }
 #endif
 
+#ifdef __SD_FIRMWARE_UPDATE__
+// Firmware update from the SD card (fw_update.c), runs in the sweep thread
+//   fwupdate                   version, size and CRC32 of the running firmware
+//   fwupdate {file}            check the file and read it as the update would, nothing is changed
+//   fwupdate {file} flash      install the file and restart
+VNA_SHELL_FUNCTION(cmd_fwupdate)
+{
+  if (argc == 0) {
+    shell_printf("%s size %u crc32 %08x" VNA_SHELL_NEWLINE_STR,
+                 fw_header.version, fw_header.image_size, fwu_running_crc());
+    return;
+  }
+  if (argc > 2 || argv[0][0] == '?' || (argc == 2 && strcmp(argv[1], "flash") != 0)) {
+    usage_printf("fwupdate [{file} [flash]]" VNA_SHELL_NEWLINE_STR);
+    return;
+  }
+  fw_header_t hdr;
+  int err = fwu_begin();
+  if (err == FWU_OK)
+    err = fwu_read_header(argv[0], &hdr);
+  if (err == FWU_OK) {
+    shell_printf("file %s size %u" VNA_SHELL_NEWLINE_STR, hdr.version, hdr.image_size);
+    err = fwu_prepare(argv[0], &hdr);
+  }
+  if (err == FWU_OK) {
+    shell_printf("crc32 %08x, %u sector run(s), %s card: OK" VNA_SHELL_NEWLINE_STR,
+                 fwu_image_crc(), fwu_extent_count(), fwu_card_byte_addressing() ? "SDSC" : "SDHC/SDXC");
+    if (argc == 2) {
+      shell_printf("updating, the tinySA restarts when done" VNA_SHELL_NEWLINE_STR);
+      chThdSleepMilliseconds(100);      // let USB send the text
+      fwu_draw_screen(&hdr);
+      fwu_start();
+    }
+  } else
+    shell_printf("error: %s" VNA_SHELL_NEWLINE_STR, fwu_error_text(err));
+  fwu_end();
+}
+#endif
+
 config_t config = {
   .magic =             CONFIG_MAGIC,
   .dac_value =         1922,
@@ -2635,6 +2674,9 @@ static const VNAShellCommand commands[] =
 #ifdef __USE_USB_MSC__
     { "usbdisk",   cmd_usbdisk,   CMD_DISK_OK },
 #endif
+#ifdef __SD_FIRMWARE_UPDATE__
+    { "fwupdate",  cmd_fwupdate,  CMD_WAIT_MUTEX },
+#endif
 #ifdef ENABLE_THREADS_COMMAND
     {"threads"     , cmd_threads     , CMD_DISK_OK},
 #endif
@@ -2950,10 +2992,19 @@ static void VNAShell_executeLine(char *line)
     // shell_direct_cmd tells usb_disk_mode() to wait for a command already running in this thread.
     chSysLock();
     bool refuse = msc_disk_mode && !(cmd_flag & CMD_DISK_OK);
+#ifdef __SD_FIRMWARE_UPDATE__
+    bool fw_update = fwu_active;        // firmware update owns SPI1 and the SD card, refuse all commands
+    refuse |= fw_update;
+#endif
     if (!refuse && !(cmd_flag & CMD_WAIT_MUTEX))
       shell_direct_cmd = true;
     chSysUnlock();
     if (refuse) {
+#ifdef __SD_FIRMWARE_UPDATE__
+      if (fw_update)
+        shell_printf("firmware update active" VNA_SHELL_NEWLINE_STR VNA_SHELL_PROMPT_STR);
+      else
+#endif
       shell_printf("usb disk mode active" VNA_SHELL_NEWLINE_STR VNA_SHELL_PROMPT_STR);
       return;
     }

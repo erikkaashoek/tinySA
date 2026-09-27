@@ -114,6 +114,15 @@ run_file:
   ili9341_set_foreground(LCD_FG_COLOR);
   ili9341_set_background(LCD_BG_COLOR);
   switch (keypad_mode) {
+#ifdef __SD_FIRMWARE_UPDATE__
+  /*
+   * Firmware update, fw_update_ui() returns only on cancel or error
+   */
+  case FMT_BIN_FILE:
+    f_close(fs_file);
+    fw_update_ui(fno.fname);
+    return;
+#endif
   case FMT_TBL_FILE:
   {
     const int buffer_size = 256;

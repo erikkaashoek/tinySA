@@ -110,6 +110,7 @@
 #define __SD_CARD_DUMP_FIRMWARE__ // Allow dump firmware to SD card
 #define __SD_FILE_BROWSER__
 #define __USE_USB_MSC__           // USB DISK mode: SD card as USB mass storage next to the USB serial port
+#define __SD_FIRMWARE_UPDATE__    // Install a firmware .bin from the SD card (fw_update.c)
 #define __LCD_BRIGHTNESS__        // LCD or hardware allow change brightness, add menu item for this
 #define __HARMONIC__
 #define __NOISE_FIGURE__
@@ -1751,6 +1752,7 @@ void rtc_set_time(uint32_t dr, uint32_t tr);
 extern uint16_t sd_card_inserted_at_boot;
 bool SD_Inserted(void);
 void SD_PowerOff(void);
+bool SD_BlockAddressing(void);     // initialized card uses block (sector) addresses (SDHC/SDXC)
 // Buffers for SD card use spi_buffer
 #if SPI_BUFFER_SIZE < 2048
 #error "SPI_BUFFER_SIZE for SD card support need size >= 2048"
@@ -1785,6 +1787,12 @@ void clock_at_48MHz(void);
 #endif
 #if defined(__USE_USB_MSC__) && !defined(__USE_SD_CARD__)
 #error "__USE_USB_MSC__ needs __USE_SD_CARD__"
+#endif
+#if defined(__SD_FIRMWARE_UPDATE__) && (!defined(TINYSA4) || !defined(__USE_USB_MSC__) || !defined(__SD_FILE_BROWSER__))
+#error "__SD_FIRMWARE_UPDATE__ needs TINYSA4, __USE_USB_MSC__ and __SD_FILE_BROWSER__"
+#endif
+#ifdef __SD_FIRMWARE_UPDATE__
+#include "fw_update.h"
 #endif
 
 /*

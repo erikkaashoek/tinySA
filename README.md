@@ -86,6 +86,18 @@ Or simply use make.
 
     $ make flash
 
+### Update from the SD card (tinySA Ultra)
+
+The tinySA Ultra can install a new firmware from its SD card, without DFU:
+
+1. Copy the firmware `.bin` file to the root folder of the SD card, for example with STORAGE→USB DISK. Eject the drive when the copy is done.
+2. Select STORAGE→UPDATE FIRMWARE, pick the file and confirm with UPDATE.
+3. The tinySA checks the file, programs it in about 10 seconds and restarts. Do not switch it off or remove the SD card during the update. If the card is removed anyway, the update waits and continues when it is inserted again.
+
+Settings, calibration and presets are kept. The shell command `fwupdate {file}` checks a file without changing anything, `fwupdate {file} flash` installs it.
+
+Only firmware that contains the update header (from this version on) can be installed from the SD card; older versions and the tinySA basic firmware are refused. If an update is interrupted, the tinySA does not start: hold the jog button while switching on to enter DFU mode and flash the firmware with a PC as above.
+
 ## Companion Tools
 
 There are several numbers of great companion PC tools from third-party.

@@ -179,6 +179,7 @@ CSRC = $(STARTUPSRC) \
        FatFs/ffunicode.c \
        usbcfg.c \
        usb_msc.c \
+       fw_update.c \
        NANOVNA_STM32_F303/adc.c \
        main.c plot.c ui.c ili9341.c tlv320aic3204.c si5351.c numfont20x22.c Font5x7.c Font10x14.c flash.c si4468.c  Font7x13b.c rtc.c
 else
