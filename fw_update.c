@@ -25,11 +25,13 @@
 #endif
 
 //*****************************************************************************
-// Image header of this firmware, placed after the vector table by the linker script
+// Image header and trailer of this firmware. The linker script places the header after the
+// vector table and the trailer at the end of the image.
 //*****************************************************************************
 extern const char __fw_image_size__[];   // linker script symbol, its address is the image size
 
 _Static_assert(sizeof(VERSION) <= sizeof(((fw_header_t *)0)->version), "VERSION too long for fw_header_t");
+_Static_assert(sizeof(fw_trailer_t) == 12, "fw_trailer_t must be 12 bytes");
 
 __attribute__((used, section(".fwinfo")))
 const fw_header_t fw_header = {
@@ -43,6 +45,13 @@ const fw_header_t fw_header = {
   .version     = VERSION,
 };
 
+__attribute__((used, section(".fwtrailer")))
+const fw_trailer_t fw_trailer = {
+  .magic       = FW_TRAILER_MAGIC,
+  .image_size  = (uint32_t)__fw_image_size__,
+  .crc         = FW_CRC_UNSET,
+};
+
 //*****************************************************************************
 // Limits and layout
 //*****************************************************************************
@@ -51,9 +60,14 @@ const fw_header_t fw_header = {
 #define FWU_MAX_PAGES       ((FWU_APP_END - FWU_APP_START) / FLASH_PAGESIZE)
 #define FWU_MAX_EXTENTS     64                  // contiguous sector runs of the image file
 #define FWU_SECTOR_SIZE     512
-#define FWU_RAM_START       0x20000000U
-#define FWU_RAM_END         (0x20000000U + 40*1024)
 #define FWU_MIN_BATTERY_MV  3500
+
+extern const char __ram0_start__[], __ram0_end__[];   // RAM of this MCU, from the linker script
+
+// FWU_APP_END as a symbol, STM32F303xC.ld checks that it is the end of flash0
+#define FWU_STR_(x)         #x
+#define FWU_STR(x)          FWU_STR_(x)
+__asm__(".global __fwu_app_end__\n\t.set __fwu_app_end__, " FWU_STR(FWU_APP_END));
 #define FWU_PAGE_BUF        ((uint8_t *)spi_buffer)                    // 2 KB page buffer in SRAM (4 KB spi_buffer)
 #define FWU_PAGE0_BUF       ((uint8_t *)spi_buffer + FLASH_PAGESIZE)   // page 0, read before the erase starts
 
@@ -223,8 +237,6 @@ FWU_TEXT static void fwu_bar(uint32_t done, uint32_t color) {
 #define FWU_CMD55           (0x40 + 55)   // APP_CMD
 #define FWU_CMD58           (0x40 + 58)   // READ_OCR
 #define FWU_ACMD41          (0x40 + 41)   // SD_SEND_OP_COND
-#define FWU_SD_SPEED        SPI_BR_DIV2   // as SD_SPI_SPEED and LCD_SPI_SPEED in ili9341.c
-#define FWU_SD_INIT_SPEED   SPI_BR_DIV256 // as SD_INIT_SPI_SPEED in ili9341.c
 
 FWU_TEXT static bool fwu_sd_wait_ready(uint32_t ms) {
   uint32_t t0 = FWU_NOW();
@@ -265,7 +277,7 @@ FWU_TEXT static bool fwu_sd_init(void) {
   fwu_spi_flush();
   FWU_LCD_CS_HIGH();
   FWU_SD_CS_HIGH();
-  SPI_BR_SET(SPI1, FWU_SD_INIT_SPEED);
+  SPI_BR_SET(SPI1, SD_INIT_SPI_SPEED);
   for (int i = 0; i < 10; i++)            // 80 clocks with the card not selected
     fwu_spi_xfer(0xFF);
   FWU_SD_CS_LOW();
@@ -302,7 +314,7 @@ FWU_TEXT static bool fwu_sd_init(void) {
   }
   FWU_SD_CS_HIGH();
   fwu_spi_xfer(0xFF);
-  SPI_BR_SET(SPI1, FWU_SD_SPEED);
+  SPI_BR_SET(SPI1, SD_SPI_SPEED);
   if (ok)
     fwu_job.byte_addr = byte_addr;
   return ok;
@@ -652,7 +664,7 @@ int fwu_read_header(const char *path, fw_header_t *hdr) {
       size > FWU_APP_END - FWU_APP_START || size > fsize)
     return FWU_E_SIZE;
   uint32_t sp = w[0], reset = w[1];
-  if (sp <= FWU_RAM_START || sp > FWU_RAM_END || !(reset & 1) ||
+  if (sp <= (uint32_t)__ram0_start__ || sp > (uint32_t)__ram0_end__ || !(reset & 1) ||
       reset < FWU_APP_START + hofs + hdr->hdr_size || reset >= FWU_APP_START + size)
     return FWU_E_VECTOR;
   return FWU_OK;

@@ -4544,7 +4544,8 @@ static bool fw_update_confirm(const fw_header_t *hdr) {
 }
 
 // Check the file, ask, check the image and update. Returns only on cancel or error.
-static void fw_update_ui(const char *fname) {
+// Not inlined: its locals would otherwise enlarge the stack frame of browser_open_file() for every file type
+__attribute__((noinline)) static void fw_update_ui(const char *fname) {
   fw_header_t hdr;
   int err = fwu_begin();
   if (err == FWU_OK)

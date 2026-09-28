@@ -46,6 +46,10 @@
 
 #define SPI_BR_SET(spi, br)  (spi->CR1 = (spi->CR1& ~(SPI_CR1_BR))|br)
 
+// SD card SPI speed on work and on initialization (100-400kHz need), for ili9341.c and fw_update.c
+#define SD_SPI_SPEED        SPI_BR_DIV2
+#define SD_INIT_SPI_SPEED   SPI_BR_DIV256
+
 //*****************************************************
 // SPI bus activity macros
 //*****************************************************

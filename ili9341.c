@@ -70,10 +70,10 @@
 #define __USE_DISPLAY_DMA_RX__
 #endif
 
-// Define SD SPI speed on work
-#define SD_SPI_SPEED        SPI_BR_DIV2
-// Define SD SPI speed on initialization (100-400kHz need)
-#define SD_INIT_SPI_SPEED   SPI_BR_DIV256
+// SD_SPI_SPEED and SD_INIT_SPI_SPEED are in spi.h, the SD firmware update uses them too
+#if defined(__SD_FIRMWARE_UPDATE__) && (LCD_SPI_SPEED != SD_SPI_SPEED)
+#error "fw_update.c draws its progress bar at the SD card speed, LCD_SPI_SPEED must equal SD_SPI_SPEED"
+#endif
 
 // Disable DMA rx on disabled DMA tx
 #ifdef __USE_DISPLAY_DMA__
@@ -1754,12 +1754,12 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
       if ((SD_SendCmd(CMD9, 0) == 0) && SD_RxDataBlock(csd, 16, SD_TOKEN_START_BLOCK)) {
         uint32_t n, csize;
         if ((csd[0] >> 6) == 1)  {  // SDC V2
-          csize = ((uint32_t)csd[7]<<16)|((uint32_t)csd[8]<< 8)|((uint32_t)csd[9]<< 0);
+          csize = ((uint32_t)(csd[7]&0x3F)<<16)|((uint32_t)csd[8]<< 8)|((uint32_t)csd[9]<< 0);
           n = 10;
         }
-        else {                      // MMC or SDC V1
+        else {                      // MMC or SDC V1: (C_SIZE+1) << (READ_BL_LEN + C_SIZE_MULT + 2) bytes
           csize = ((uint32_t)csd[8]>>6)|((uint32_t)csd[7]<<2)|((uint32_t)(csd[6]&0x03)<<10);
-          n = ((csd[5]&0x0F)|((csd[10]&0x80)>>7)|((csd[9]&0x03)<<1)) + 2 - 9;
+          n = (csd[5]&0x0F) + (((csd[10]&0x80)>>7)|((csd[9]&0x03)<<1)) + 2 - 9;
         }
         *(uint32_t*)buff = (csize+1)<<n;
         res = RES_OK;

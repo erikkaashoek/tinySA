@@ -160,13 +160,10 @@ INCLUDE rules_data.ld
 
 SECTIONS
 {
-    /* Firmware image trailer (fw_update.h fw_trailer_t), must be the last data in flash:
-       end magic "FEND", image size, CRC32 (0xFFFFFFFF = not set) */
+    /* Firmware image trailer (fw_trailer in fw_update.c), must be the last data in flash */
     .fwtrailer : ALIGN(4)
     {
-        LONG(0x444E4546)
-        LONG(__fw_image_size__)
-        LONG(0xFFFFFFFF)
+        KEEP(*(.fwtrailer))
         __fw_image_end__ = .;
     } > flash0
 
@@ -182,3 +179,5 @@ __fw_image_size__ = __fw_image_end__ - ORIGIN(flash0);
 ASSERT(ADDR(.fwinfo) == ORIGIN(flash0) + SIZEOF(vectors), "firmware header must follow the vectors")
 ASSERT(LOADADDR(.fwtrailer) >= LOADADDR(.data) + SIZEOF(.data), "firmware trailer must be the last data in flash")
 ASSERT(LOADADDR(.fwtrailer) >= LOADADDR(.ram4_init) + SIZEOF(.ram4_init), "firmware trailer must be the last data in flash")
+/* The SD firmware update (fw_update.c) programs flash up to FWU_APP_END = SAVE_CONFIG_ADDR (nanovna.h) */
+ASSERT(!DEFINED(__fwu_app_end__) || __fwu_app_end__ == ORIGIN(flash0) + LENGTH(flash0), "FWU_APP_END (SAVE_CONFIG_ADDR) must be the end of flash0")
