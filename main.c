@@ -1022,20 +1022,167 @@ VNA_SHELL_FUNCTION(cmd_release)
 
 #endif
 
+#ifdef TINYSA4
+// Row y of the screen for a capture, y counting up from 0: the screen is read as one DMA stream,
+// the next row into the other half of buf (2 * LCD_WIDTH pixels) while the caller uses row y.
+// A caller leaving before the last row ends the stream with ili9341_read_memory_end().
+static uint16_t *capture_read_row(uint16_t *buf, int y)
+{
+  if (y == 0) {
+    ili9341_read_memory_start(0, 0, LCD_WIDTH, LCD_HEIGHT);
+    ili9341_read_memory_next(buf, LCD_WIDTH);
+  }
+  if (y + 1 < LCD_HEIGHT)
+    ili9341_read_memory_next(&buf[((y + 1) & 1) * LCD_WIDTH], LCD_WIDTH);
+  else
+    ili9341_read_memory_end();
+  return &buf[(y & 1) * LCD_WIDTH];
+}
+#endif
+
+#ifdef __CAPTURE_RLE8__
+/*
+ * Screen capture in the NanoVNA-D (DiSlord) RLE8 format, sent by "capture" with any argument:
+ *   "BM", u16 width, u16 height, u8 8 (bits per pixel), u8 1 (compression),
+ *   u16 palette size in bytes, palette (pixels as read from the LCD),
+ *   then for every row u16 size + the PackBits packed palette indices of the row
+ * The palette holds all colours the tinySA draws (see plot_capture_colors()), so the screen is read once.
+ * Other content (image viewer, display test) sets capture_verify: the screen is read twice to add its colours.
+ */
+#define CAPTURE_PALETTE_SIZE  256
+bool capture_verify = false;
+static uint16_t capture_palette[CAPTURE_PALETTE_SIZE];    // sorted
+static uint16_t capture_colors;
+
+// Position of colour c in the sorted palette, or where it has to be inserted
+static int capture_palette_find(uint16_t c)
+{
+  int lo = 0, hi = capture_colors;
+  while (lo < hi) {
+    int mid = (lo + hi) / 2;
+    if (capture_palette[mid] < c) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// Returns false if the palette is full
+bool capture_palette_add(uint16_t c)
+{
+  int i = capture_palette_find(c);
+  if (i < capture_colors && capture_palette[i] == c)
+    return true;
+  if (capture_colors >= CAPTURE_PALETTE_SIZE)
+    return false;
+  memmove(&capture_palette[i + 1], &capture_palette[i], (capture_colors - i) * sizeof(uint16_t));
+  capture_palette[i] = c;
+  capture_colors++;
+  return true;
+}
+
+// PackBits (DiSlord, NanoVNA-D common.c), returns the packed size, at most size + size / 128 + 1
+static int packbits(const uint8_t *source, uint8_t *dest, int size)
+{
+  int i = 0, rle, l, pk = 0, sz = -1;
+  while (i < size) {
+    l = size - i;
+    if (l > 128) l = 128;                               // limit a run to 128 bytes
+    uint8_t c = source[i++];
+    for (rle = 0; --l && c == source[i + rle];) rle++;  // run of rle + 1 bytes
+    if (sz >= 0 && rle < 2) rle = 0;                    // keep runs shorter than 3 in the literal block
+    else if (sz < 0 || rle > 0) sz = pk++;              // start a new block
+    dest[pk++] = c;
+    if (rle > 0) {i += rle; dest[sz] = -rle;}           // run block done
+    else if ((dest[sz] = pk - sz - 2) < 127)            // extend the literal block up to 128 bytes
+      continue;
+    sz = -1;
+  }
+  return pk;
+}
+
+// Returns false, with nothing sent, if the screen has too many colours
+static bool capture_rle8(void)
+{
+#if SPI_BUFFER_SIZE < (256 + 2*LCD_WIDTH)
+#error "Low size of spi_buffer for capture_rle8"
+#endif
+#ifdef __USE_SD_CARD__
+  _Static_assert((256 + 2*LCD_WIDTH) * sizeof(pixel_t) <= SPI_BUFFER_SIZE * sizeof(pixel_t) - sizeof(FATFS) - sizeof(FIL),
+                 "capture_rle8 buffers overlap the FatFs objects at the end of spi_buffer");
+#endif
+  static const struct {uint16_t header, width, height; uint8_t bit_per_pixel, compression;}
+    rle8_header = {0x4D42, LCD_WIDTH, LCD_HEIGHT, 8, 1};
+  // spi_buffer: u16 size + packed row (at most 2 + LCD_WIDTH + LCD_WIDTH/128 + 1 bytes), then the
+  // two row buffers of capture_read_row(). A row is replaced by its indices in place.
+  uint16_t *packed = spi_buffer;
+  uint16_t *rows   = &spi_buffer[256];
+  capture_colors = 0;
+  for (int i = 0; i < MAX_PALETTE; i++)
+    capture_palette_add(GET_PALTETTE_COLOR(i));
+  plot_capture_colors();
+  // With other content on the screen first add the colours on it (pass 0), then send (pass 1)
+  for (int pass = capture_verify ? 0 : 1; pass < 2; pass++) {
+    uint16_t colors = capture_colors, c = capture_palette[0];
+    int i = 0;
+    if (pass == 1) {
+      uint16_t size = capture_colors * sizeof(uint16_t);
+      streamWrite(shell_stream, (void *)&rle8_header, sizeof(rle8_header));
+      streamWrite(shell_stream, (void *)&size, sizeof(size));
+      streamWrite(shell_stream, (void *)capture_palette, size);
+    }
+    for (int y = 0; y < LCD_HEIGHT; y++) {
+      uint16_t *row = capture_read_row(rows, y);
+      if (pass == 0) {
+        for (int x = 0; x < LCD_WIDTH; x++)
+          if (row[x] != c && !capture_palette_add(c = row[x])) {
+            if (y + 1 < LCD_HEIGHT)
+              ili9341_read_memory_end();
+            return false;
+          }
+        continue;
+      }
+      uint8_t *index = (uint8_t *)row;
+      for (int x = 0; x < LCD_WIDTH; x++) {
+        if (row[x] != c) {
+          c = row[x];
+          i = capture_palette_find(c);
+          if (i >= capture_colors || capture_palette[i] != c) {
+            i = 0;                      // not in the palette: the next capture reads the screen twice
+            capture_verify = true;
+          }
+        }
+        index[x] = i;
+      }
+      packed[0] = packbits(index, (uint8_t *)&packed[1], LCD_WIDTH);
+      streamWrite(shell_stream, (void *)packed, packed[0] + sizeof(uint16_t));
+    }
+    if (pass == 0 && capture_colors == colors)  // nothing new, the other content is gone
+      capture_verify = false;
+  }
+  return true;
+}
+#endif
+
 VNA_SHELL_FUNCTION(cmd_capture)
 {
   // read pixel count at one time (PART*2 bytes required for read buffer)
   (void)argc;
   (void)argv;
+#ifdef __CAPTURE_RLE8__
+  if (argc > 0 && capture_rle8())       // any argument as in NanoVNA-D, raw if the screen has too many colours
+    return;
+#endif
   int y;
-#ifdef TINYSA4  
+#ifdef TINYSA4
 #if SPI_BUFFER_SIZE < (2*LCD_WIDTH)
 #error "Low size of spi_buffer for cmd_capture"
 #endif
+  // DMA reads the next row while USB sends this one
+  for (y = 0; y < LCD_HEIGHT; y++)
+    streamWrite(shell_stream, (void*)capture_read_row(spi_buffer, y), LCD_WIDTH * sizeof(uint16_t));
 #else
 #if SPI_BUFFER_SIZE < (3*LCD_WIDTH + 1)
 #error "Low size of spi_buffer for cmd_capture"
-#endif
 #endif
   // read 2 row pixel time (read buffer limit by 2/3 + 1 from spi_buffer size)
   for (y = 0; y < LCD_HEIGHT; y += 2) {
@@ -1044,6 +1191,7 @@ VNA_SHELL_FUNCTION(cmd_capture)
     ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
     streamWrite(shell_stream, (void*)buf, 2 * LCD_WIDTH * sizeof(uint16_t));
   }
+#endif
 }
 
 #ifdef ENABLE_SD_CARD_CMD
