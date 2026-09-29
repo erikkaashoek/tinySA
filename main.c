@@ -578,15 +578,14 @@ VNA_SHELL_FUNCTION(cmd_reset)
 {
   (void)argc;
   (void)argv;
-#ifndef TINYSA4
   if (argc == 1) {
     if (get_str_index(argv[0], "dfu") == 0) {
       shell_printf("Performing reset to DFU mode\r\n");
+      chThdSleepMilliseconds(100);        // let USB send the text
       enter_dfu();
       return;
     }
   }
-#endif
   shell_printf("Performing reset\r\n");
   rccEnableWWDG(FALSE);
   WWDG->CFR = 0x60;
