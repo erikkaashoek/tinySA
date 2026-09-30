@@ -734,10 +734,10 @@ void ili9341_read_memory(int x, int y, int w, int h, uint16_t *out)
 
 #ifdef LCD_DRIVER_ST7796S
 // ST7796S send data in RGB565 format, not need parse it
-// Copy ST7796S screen data to buffer
-void ili9341_read_memory(int x, int y, int w, int h, uint16_t *out)
+// Read a screen area as one stream: ili9341_read_memory_start(), ili9341_read_memory_next() for every
+// part, ili9341_read_memory_end(). With DMA a part is read while the caller processes the previous one.
+void ili9341_read_memory_start(int x, int y, int w, int h)
 {
-  uint16_t len = w * h;
   ili9341_setWindow(ILI9341_MEMORY_READ, x, y, w, h);
   // Skip data from rx buffer
   spi_DropRx();
@@ -747,17 +747,38 @@ void ili9341_read_memory(int x, int y, int w, int h, uint16_t *out)
 #endif
   // require 8bit dummy clock
   spi_RxByte();
-  // receive pixel data to buffer
+}
+
+// Wait for the previous part, then read len pixels to out
+void ili9341_read_memory_next(uint16_t *out, int len)
+{
 #ifndef __USE_DISPLAY_DMA_RX__
   spi_RxBuffer((uint8_t *)out, len * 2);
 #else
-  spi_DMARxBuffer((uint8_t *)out, len * 2, true);
+  dmaChannelWaitCompletionRxTx();
+  spi_DMARxBuffer((uint8_t *)out, len * 2, false);
+#endif
+}
+
+// Wait for the last part
+void ili9341_read_memory_end(void)
+{
+#ifdef __USE_DISPLAY_DMA_RX__
+  dmaChannelWaitCompletionRxTx();
 #endif
   // restore speed if need
 #ifdef LCD_SPI_RX_SPEED
   SPI_BR_SET(LCD_SPI, LCD_SPI_SPEED);
 #endif
   LCD_CS_HIGH;
+}
+
+// Copy ST7796S screen data to buffer
+void ili9341_read_memory(int x, int y, int w, int h, uint16_t *out)
+{
+  ili9341_read_memory_start(x, y, w, h);
+  ili9341_read_memory_next(out, w * h);
+  ili9341_read_memory_end();
 }
 #endif
 

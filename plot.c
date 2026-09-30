@@ -2152,6 +2152,9 @@ int display_test(void)
   if (!display_test_pattern(0xd200))
       return false;
 #endif
+#ifdef __CAPTURE_RLE8__
+  capture_verify = true;    // the test pattern is not in the capture palette
+#endif
   for (int h = 0; h < LCD_HEIGHT; h++) {
     // write test pattern to LCD
     for (int w = 0; w < LCD_WIDTH; w++)
@@ -2172,6 +2175,28 @@ int display_test(void)
 #define _USE_WATERFALL_PALETTE
 #ifdef  _USE_WATERFALL_PALETTE
 #include "waterfall.c"
+#endif
+
+#ifdef __CAPTURE_RLE8__
+#ifndef _USE_WATERFALL_PALETTE
+#error "__CAPTURE_RLE8__ needs _USE_WATERFALL_PALETTE"
+#endif
+// Add the colours drawn outside the LCD palette to the capture palette: the waterfall, and the
+// traces, which draw_cell() ORs over each other and over the colours drawn before them
+void plot_capture_colors(void)
+{
+  static const uint8_t below_traces[] = {LCD_BG_COLOR, LCD_HAM_COLOR, LCD_GRID_COLOR, LCD_TRIGGER_COLOR, LCD_GRID_VALUE_COLOR};
+  for (uint32_t i = 0; i < ARRAY_COUNT(waterfall_palette); i++)
+    capture_palette_add(waterfall_palette[i]);
+  for (int traces = 1; traces < (1 << TRACES_MAX); traces++) {
+    uint16_t c = 0;
+    for (int t = 0; t < TRACES_MAX; t++)
+      if (traces & (1 << t))
+        c |= GET_PALTETTE_COLOR(LCD_TRACE_1_COLOR + t);
+    for (uint32_t i = 0; i < ARRAY_COUNT(below_traces); i++)
+      capture_palette_add(c | GET_PALTETTE_COLOR(below_traces[i]));
+  }
+}
 #endif
 
 static void update_waterfall(void){

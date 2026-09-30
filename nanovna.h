@@ -111,6 +111,7 @@
 #define __SD_FILE_BROWSER__
 #define __USE_USB_MSC__           // USB DISK mode: SD card as USB mass storage next to the USB serial port
 #define __SD_FIRMWARE_UPDATE__    // Install a firmware .bin from the SD card (fw_update.c)
+#define __CAPTURE_RLE8__          // capture with an argument sends the screen RLE8 compressed (NanoVNA-D format)
 #define __LCD_BRIGHTNESS__        // LCD or hardware allow change brightness, add menu item for this
 #define __HARMONIC__
 #define __NOISE_FIGURE__
@@ -306,6 +307,12 @@ typedef struct {
   int16_t h;
 } remote_region_t;
 void send_region(remote_region_t *rd, uint8_t * buf, uint16_t size);
+#endif
+
+#ifdef __CAPTURE_RLE8__
+extern bool capture_verify;         // screen may show colours outside the capture palette
+bool capture_palette_add(uint16_t c);
+void plot_capture_colors(void);
 #endif
 
 void set_marker_frequency(int m, freq_t f);
@@ -1215,6 +1222,11 @@ int  ili9341_drawchar_size(uint8_t ch, int x, int y, uint8_t size, int x_max);
 int  ili9341_drawstring_size(const char *str, int x, int y, uint8_t size, int x_max);
 void ili9341_drawfont(uint8_t ch, int x, int y);
 void ili9341_read_memory(int x, int y, int w, int h, uint16_t* out);
+#ifdef TINYSA4
+void ili9341_read_memory_start(int x, int y, int w, int h);
+void ili9341_read_memory_next(uint16_t *out, int len);
+void ili9341_read_memory_end(void);
+#endif
 void ili9341_line(int x0, int y0, int x1, int y1);
 void ili9341_define_scroll(uint16_t tfa, uint16_t bfa);
 void ili9341_scroll(uint16_t start);

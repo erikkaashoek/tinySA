@@ -750,22 +750,21 @@ extern const char *states[];
   lcd_set_font(FONT_SMALL);
 }
 
-#ifdef __HAS_DFU__
+// Also used by "reset dfu" on the tinySA4, which has no DFU menu (__HAS_DFU__)
 void
 enter_dfu(void)
 {
   int x = 5, y = 5;
   ili9341_set_foreground(LCD_FG_COLOR);
   ili9341_set_background(LCD_BG_COLOR);
-  // leave a last message 
+  // leave a last message
   ili9341_clear_screen();
   ili9341_drawstring_7x13("DFU: Device Firmware Update Mode\n"
                           "To exit DFU mode, please reset device yourself.", x, y);
-  // see __early_init in ./NANOVNA_STM32_F072/board.c
+  // see __early_init in ./NANOVNA_STM32_F072/board.c and ./NANOVNA_STM32_F303/board.c
   *((unsigned long *)BOOT_FROM_SYTEM_MEMORY_MAGIC_ADDRESS) = BOOT_FROM_SYTEM_MEMORY_MAGIC;
   NVIC_SystemReset();
 }
-#endif
 
 static void
 select_lever_mode(int mode)

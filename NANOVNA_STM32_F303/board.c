@@ -114,11 +114,15 @@ void __early_init(void) {
     bootloader();
     while(1);
    #else
-    __disable_irq();
-    uint32_t foo = SYSCFG->CFGR1;
-    foo = (foo & ~SYSCFG_CFGR1_MEM_MODE) || SYSCFG_CFGR1_MEM_MODE_0;
-    SYSCFG->CFGR1 = foo;
+    // Map the system memory at 0 so interrupts use the bootloader vectors (SYSCFG needs its clock)
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    SYSCFG->CFGR1 = (SYSCFG->CFGR1 & ~SYSCFG_CFGR1_MEM_MODE) | SYSCFG_CFGR1_MEM_MODE_0;
     __DSB();
+    __ISB();
+    // The bootloader needs interrupts, crt0 disabled them (as in the F072 board.c)
+    __enable_irq();
+    // and the main stack, crt0 switched to the process stack
+    __set_CONTROL(0);
     __ISB();
 
       __set_MSP(*((uint32_t *)(STM32F303xC_SYSTEM_MEMORY)));

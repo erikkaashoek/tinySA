@@ -290,6 +290,9 @@ static char cmd_buffer[256+128];
     uint16_t *buf_16 = spi_buffer; // prepare buffer
     res = f_read(fs_file, (void *)buf_16, sizeof(bmp_header_v4), &size); // read heaser
     if (res != FR_OK || buf_16[9] != LCD_WIDTH || buf_16[11] != LCD_HEIGHT || buf_16[14] != 16) {error = "Format err"; break;}
+#ifdef __CAPTURE_RLE8__
+    capture_verify = true;   // the image can hold any colour
+#endif
     for (y = LCD_HEIGHT-1; y >=0 && res == FR_OK; y--) {
       res = f_read(fs_file, (void *)buf_16, LCD_WIDTH * sizeof(uint16_t), &size);
       swap_bytes(buf_16, LCD_WIDTH);
