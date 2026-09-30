@@ -1,0 +1,1208 @@
+v1.4xxx 2026-09-30 For all tinySA models
+- USB serial: fixed the PC waiting for more data after a reply that is a multiple of 64 bytes long
+- Fixed a race in the console command handling that could hang a command
+- Button auto repeat keeps working after the system timer wraps around (about every 5 days)
+- Fixed SD card multiple block reads and read timeouts with slow SDHC/SDXC cards (Ultra only)
+- New USB DISK mode: the SD card shows up as a USB drive on the PC (STORAGE > MORE or "usbdisk on|off") (Ultra only)
+- The tinySA Ultra is now a composite USB device (serial port + disk), Windows assigns a new COM port the first time (Ultra only)
+- New firmware update from the SD card (STORAGE > MORE > UPDATE FIRMWARE or "fwupdate {file} [flash]"), config, calibration and presets are kept (Ultra only)
+- Fixed the size of SD cards up to 2 GB in USB DISK mode (Ultra only)
+- STORAGE > CONFIG is now STORAGE > MORE and also holds USB DISK and UPDATE FIRMWARE (Ultra only)
+- "capture rle" sends the screen compressed (NanoVNA-D RLE8 format), about 10x less data and twice as fast (Ultra only)
+- "capture" is about 30% faster (Ultra only)
+- "reset dfu" now also works on the tinySA Ultra
+- Small robustness improvements
+
+v1.4241 2026-09-07 All Ultra model
+- Keypad extended with more symbols
+
+v1.4236 2026-08-12 All Ultra models
+- A long press on the backspace key (> 0.5 s, small left arrow) will delete all characters of the filename present in the filename keypad when the key is released
+
+v1.4235 2026-08-12 All Ultra models
+- Added unit dBV
+- When saving a preset loaded from SD to SD the file name will be prefilled with the name used to load the preset
+
+v1.4234 2026-08-10 All Ultra versions
+- Grid now visible when only trace 3 is selected
+
+v1.4233 2026-08-06 All Ultra models
+- MIN_RSSI changed to -160
+
+v1.4232 2026-08-05 All Ultra models
+- Status panel shows controls settings impacting measurement accuracy in red
+- Reduced the artificial minimum internal power measurement level causing clamping under certain conditions
+- Small robustness improvements
+
+v1.4224 2026-05-06 Ultra only
+- Eliminated possible cause of incorrect marker values when capturing the screen to SD card before a first scan on a new signal was completed
+
+v1.4223 2026-03-24 For all tinySA models
+- Merged fix for occasional hang after sending serial commands.
+- Added power difference between side channels and center channel (see below)
+- Added "channel [1-3]" command that lists the total power in all three channel when no id is specified or the power in the selected channel. Channel 2 is the central channel.
+
+v1.4221 2026-03-03 For all tinySA models
+- In NFM output modulation mode the center frequency is now correct (tinySA basic only)
+- CTCSS menu text changed to "CTCSS + 1 kHz tone"
+- When output below 255 Hz and CTCSS + 1 kHz tone is enabled the CTCSS tone uses 15% of the specified deviation and the approximate 1 kHz uses the specified deviation (tinySA Ultra all models only)
+
+v1.4220 2026-02-28
+- Added option in modulation menu to generate an additional audible tone close to 1 kHz when doing FM modulation below 250 Hz.
+
+This is useful when testing CTCSS and you want to hear a test tone when the gate opens.
+
+v1.4219 2026-02-24 All Ultra models
+- FREQUENCY menu shows more digits when frequencies are above 1 GHz
+- BAND menu shows more digits when frequencies are above 1 GHz
+- START/STOP and CENTER/SPAN frequency of main screen show more digits.
+
+There is insufficient space to show more digits when bands are active
+
+v1.4217 2025-12-18
+- Improved compatibility with 32 GByte SD cards. Several brands of SD cards that previously failed are now working correctly
+
+v1.4216 2025-11-05 All Ultra models
+- Removed pop-up during wait console command
+- Removed redraw at end of wait command as this can cause a stack overflow
+- Added waitscan [{scans}] console command. This commands waits for the specified number of scans, or the current scan if not specified, to conclude and leaves the device in pause mode.  All command execution will be clocked during waiting for the scans to complete
+- Switched to a newer compiler which may cause yet to be discovered bugs. Do not use this release if will not be able to install a previous release
+
+v1.4215 2025-10-20
+- Increased output level accuracy around -78 dBm
+
+This change will only have an effect on the ZS407
+
+v1.4210 2025-10-03 tinySA Ultra (+) only
+- Added MEASURE/OCCUPIED WIDTH, Asks for a level versus carrier (must be negative) and sets markers showing the occupied width at the specified level
+
+This is with level set to -40
+
+If needed, you can TRACE/CALC/MAXH or TRACE/CALC/AVER after enabling the occupied width measurement.
+
+v1.4201 2025-08-18 For tinySA Ultra models
+- Bug solved: After the command "lna on" the previous attenuation setting was still incorrectly taken into account in the level calculation and being displayed instead using and displaying an attenuation of zero.
+
+v1.4201 2025-08-01 tinySA Ultra (all variants) only
+- Updated calibration process
+
+v1.4200 2025-06-01
+- Selftest margins improved
+
+v1.4-199 2025-03-31
+- Selftest 8 corrected.
+
+v1.4-198 2025-03-26 All Ultra models
+- Possible reduction of spurs around  4.278 GHz visible on some ZS-407 HW
+
+v1.4197 2025-02-24 For all tinySA Ultra and Ultra+ versions
+
+- Added CONFIG/EXPERT CONFIG/MORE/AUDIO AGC option. When disabled the PCB edge point PA4 will in listen mode have a voltage linear with the signal level in dBm Useful for integration of tinySA as selective power meter
+- Reduced level of internally generated spurs on multiples of 10 MHz not being multiples of 30 MHz (ZS-407 only)
+
+v1.4195 2025-01-23 tinySA Ultra ZS407
+- Reduced spurs for ZS-407
+
+v1.4193 2025-01-08 tinySA Ultra ZS406
+- Improved level correction curves for the ZS406
+
+v1.4-192 2024-12-23 All Ultra models
+- Solves a bug that sometimes causes the calibration to fail causing wrong measurements below 2 MHz
+
+The calibration did sometimes fail to find a the correct calibration value for a level offset at 2 MHz depending on the selected RBW.
+If you don't measure below 2 MHz there is no risk in skipping this release
+If you don't mind a incorrect level value for 600 kHz or 850 kHz RBW below 2 MHz you can skip this release
+
+v1.4-191 2024-12-21 All Ultra models
+- Bug solved: Big number displays wrong value
+After installing this FW calibrate twice!
+
+v1.4-190 2024-12-20 All Ultra models
+- Added a model identification to the version info screen and the info command
+
+v1.4-189 2024-12-10 For ZS405 (original tinySA Ultra) and ZS406
+- Bug solved: TinySA-App can not control tinySA
+- Improved level correction table for ZS406
+WARNING: This FW update will do a clear config and can not load previously saved configurations and settings
+
+v1.4-187 2024-11-25 Ultra only
+- OIP3 data now shown as dBm
+- Quasi peak implemented for non zero span scans. MAX HOLD DECAY may be easier to use
+- Function added CONFIG/TOUCH/DRAWPAD. This converts the tinySA into a drawing pad for (small) kids. Press jog button to clear. Restart to exit.
+
+v1.4-185 2024-11-06 Ultra only
+- fixed selftest fail
+
+v1.4-184 2024-11-05 Ultra only
+- Bug solved: Can load load saved trace back into trace
+
+v1.4-177 2024-08-12 Ultra only
+- scanraw command changed to "scanraw {start freq} {stop freq} [{points}] [options]" where options is the sum of 1=unbuffered and 2=continuous. Example of continuous scanning: scanraw 1M 2M 100 2
+
+Make sure you enable the abort command using "abort on" so you can use the "abort" command to stop the continuous scanning
+
+v1.4-176 2024-08-09 Ultra only
+- Added command "restart <seconds>" will restart the tinySA after <seconds> seconds. Each invocation will restart the wait time. Use "restart 0" to stop the restart
+- Setting CONFIG/MORE/EXPERT SETTINGS/HARMONIC automatically backup up and restored after restart
+
+The restart command can be used to automatically restart the tinySA if the communication with the tinySA breaks down.
+Make sure you set the <seconds> large enough so a next restart command will always be in time, otherwise the tinySA will restart before the next restart command.
+
+v1.4-175 2024-07-02
+- Executing Selftest or Calibration forces EXT_GAIN setting to zero
+- Waterfall glitch repaired (thanks RussellAult)
+
+v1.4-171 2024-06-30 Ultra only
+- Waterfall is now correctly updated on remote desktop
+- Big number is now shown on remote desktop
+Notice: The size of the big number is reduced when in remote desktop mode.
+
+v1.4-170 2024-06-13
+- EXT GAIN should now only change when user enters new value or when manually loading settings
+
+v1.4-169 2024-05-30 Ultra only
+- EXTERNAL GAIN is now restored after restart, both for SA and SG mode
+
+WARNING: there is only one EXTERNAL GAIN setting, this is used both in SG and SA mode.
+WARNING: the restored gain has resolution limited to 0.5 dB
+
+v1.4-168 2024-05-15 Basic only
+- Bug solved: selftest not ok
+
+v1.4-166 2024-05-14 Basic only
+- Waterfall bug repaired
+
+v1.4-165 2024-05-13
+- Added abort [off|on] command, see wiki
+
+v1.4-159 2024-04-20
+- Bug solved: Incomplete waterfall with very slow scan
+
+v1.4-156 2024-02-26 Ultra only
+- Small selftest update to avoid false positives.
+
+v1.4-151 2024-01-31 Ultra only
+- Add "HARM:" to OUTPUT field in output mode to warn if switched to harmonics mode
+- BUG solved: "Cleanest signal" harmonic mode output frequency incorrect
+- FM deviation measurement is more robust against possible Bessel null
+- Bug solved: It is possible to enter a band END frequency below the band START frequency
+- Bug solved: Pressing an empty key on a keypad causes problems
+
+v1.4-150 2024-01-28 Ultra only
+- When saving a preset a max 9 character name for the preset can be entered
+- A frequency band can be given a name of max 9 characters
+- The scanraw and scan commands can now output data over the serial interface
+
+Presets saved with previous FW versions can not be loaded with this FW version
+
+v1.4-149 2024-01-23 Ultra only
+- Improved the calibration procedure to be more robust against small HW variations
+
+v1.4-148 2024-01-21 Ultra only
+- Selftest 9 relaxed to prevent incorrect failing
+
+v1.4-147 2024-01-19 Ultra only
+- Reduced the repeat speed during jog jump max
+- Enforce battery full when doing selftest
+
+v1.4-146 2024-01-18 Ultra only
+- Jog switch left or right will autorepeat in marker jump max mode
+- Audio noise when not listening repaired
+
+v1.4-145 2024-01-16 Ultra only
+- Draw line now works in multi band mode (e.g. measuring harmonics)
+- Enabling MARKER/SEARCH MARKER/JOG JUMP MAX will enable the jog button to move the marker from maximum to maximum.
+
+v1.4-143 2024-01-10 Ultra only
+- Bug solved: Files saved with very long file names can not be loaded again.
+- Bug solved: Sometimes selftest 6 is critical on some tinySA
+- Bug solved: On some tinySA the sensitivity drops some dB around 2.35GHz
+- Bug solved: Minimum output level can be set to -124dBm where actual minimum output level is -115dBm.
+- Bug solved: Can not touch select markers 5 and above.
+
+v1.4-142 2024-01-07
+- Prevent loading incompatible settings from SD card
+- tinySA basic release brought up to latest revision
+
+v1.4-141 2024-01-02 Ultra only
+- Added AUTO SAVE in TRIGGER MENU. WHen enabled will do an auto save of trace 1 if triggered not faster then once every 30 seconds.
+- Added wait {seconds} console command, without seconds argument will wait for one full sweep. Wait can be aborted by pressing the jog button
+- Added run "filename.ext" command, only to be used in cmd files. Will start execution of named file and will NOT return to original file. Useful for cmd files that share the last part
+- Added an even larger waterfall size
+
+The run command can restart the execution of the current cmd file allowing the creation of a loop. Together with the wait command this may in the future allow repetitive tasks to be automated but currently wait,
+ run and menu 9 6 (store trace) do not work well together so please do not try this. Furthermore the screen does not show the execution of the commands as the file browser is not exiting during command execution.
+
+v1.4-140 2023-12-24 Ultra only
+- Corrected the CSV output for import into IAS
+
+This change reduces the number of digits in the level output and removed a trailing space. Hope now all the main wireless management softwares are happy with the tinySA CSV output
+
+v1.4-138 2023-12-24 Ultra only
+- Back button indicator  ("<-") added to filename keyboard
+- V unit renamed to Vrms
+- Vpp unit added
+
+Vpp measures the Vrms of the sine wave component at the selected frequency and converts it to Vpp. No actual Vpp measurement is done in the time domain. 
+
+v1.4-137 2023-12-20 Ultra only
+- Correct the version number inconsistency
+- Small change to calibration routine.
+- Small extension of selftest.
+
+v1.4-134 2023-12-08 Ultra only
+- Repaired the "Calibrate above 5.34GHz" function
+
+v1.4-132_33 2023-12-07
+- Removes some marker related display artifacts (thanks bkmit)
+
+v1.4-129 2023-11-27 Ultra only
+- Modulation frequencies below 1000 Hz can now be entered as fractional numbers. This should enable CTCSS tests
+
+The actual modulation output frequency is calibrated after 100 ms or 1 full cycle, whichever comes first
+This is the cause of the change in modulation frequency you hear after 100 ms.
+
+v1.4-128 2023-11-25
+- Modulation frequency can now be down to 1 Hz. Integer frequencies only
+- GHzHz typo corrected for Ultra
+
+v1.4-126 2023-11-15 Ultra only
+- Added STORAGE/MHZ CSV option. When enabled the CSV output format should be compatible with WWB, Soundbase, IAS and possibly others
+
+v1.4-125 2023-11-13 Ultra only
+- In MEASURE/MORE/FM you can now specify modulation frequencies up to 20kHz to help visualize a bessel null with 75kHz deviation.
+- A first attempt to level calibrate up to 10GHz is added.
+
+Remarks on the level calibration up to 10GHz
+The menu item CONFIG/LEVEL CAL/CALIBRATE 100kHz to 5.35GHz does now do an experimental level calibration up to 10GHz. No need to do the "CALIBRATE ABOVE" step anymore.
+Can people with the right equipment test if this level calibration does deliver acceptable performance (say +/-5dB accuracy up to 10GHz)
+If the level is more then +/-10dB wrong I will remove this functionality.
+
+v1.4-120 2023-10-09
+- Bug solved: crash after startup with waterfall enabled in startup preset (only tinySA Ultra)
+
+v1.4-119 2023-10-05
+- DISPLAY/SWEEP ACCURACY/SPEEDUP split between wide speedup (WSPEEDUP) and narrow speedup (NSPEEDUP)
+
+Example:
+Scanning 2.45GHz center and 100MHz span (WiFi band):
+
+    Default settings: 250ms
+    Spur reduction disabled: 130ms
+    DISPLAY/SWEEP ACCURACY/FAST enabled: 127ms
+    DISPLAY/SWEEP ACCURACY/WSPEEDUP set to 2: 92ms
+
+v1.4-109 2023-08-12 Ultra only
+- Menu and text commands now should work in cmd file
+
+v1.4-108 2023-08-11 Ultra only
+- Bug solved: can not set sweep frequencies in cmd file
+- Bug solved: can not use the text command to set filenames.
+
+v1.4-106 2023-07-22 Ultra only
+- Bug solved: Sometimes after running selftest the DIRECT mode was incorrectly left enabled
+
+v1.4-105 2023-07-21
+- USB commands added: menu, text and remark
+
+These commands allow a (remote) script to to anything possible in the menu structure and are intended for testing. but may be of more general use.
+The wait command will be added in the next release
+
+The menu command can be used to activate any menu item. The top menu item is 1, next is 2, etc.... Multiple number arguments can be used to activate nested menu's
+Example:
+menu 6 2
+toggles the waterfall setting
+Maximum 4 number arguments can be used
+WARNING: there is NO error checking, you can crash the tinySA or do other horrible things to it.
+WARNING: when activating a keypad the display update is not stopped causing a weird screen
+WARNING: use the text command to enter data when a keypad is active
+
+The text command can be used to enter data when a keypad is activated by the menu command
+Example
+menu 3 2
+text 12M
+sets the stop frequency to 12MHz
+
+The remark command does nothing and can be used to add remarks/comments to a ini or command file
+Example
+remark This is a comment.
+
+Feel free to play with these commands
+
+v1.4-104 2023-07-16 Ultra only
+- Improved FM modulation
+
+v1.4-103 2023-07-15 Ultra
+- Small improvement in HW version detection
+- Possibly reduced FM cracking
+
+v1.4-102 2023-07-06 Ultra only
+- Small improvement in HW version detection
+Unless you get "Unknown" as the HW version in the CONFIG/VERSION screen there is no need to install this update.
+
+v1.4-99 2023-06-05 Ultra only
+- Frequency correction keypad now has 'k' and 'M' keys for kilo and Mega
+- When in PAUSE mode the display is updated when changing table trace data.
+
+v1.4-97 -98 2023-05-30 Ultra only
+- Bug solved: Loading a trace table from SD card did not restore the calculated the content of the trace when not triggered. This bug caused problems when using a trace table for trigger level definitions.
+- Bug solved: Sometimes the last multi band band showed only the center frequency when the other equal size bands did show the grid step
+- Bug solved: The center frequency of a multi band band definition was incorrectly displayed
+
+These improvements are only relevant when using multi band frequency setup or trace tables in combination with triggering.
+
+v1.4-96 2023-05-11
+- Added menu MARKER/X MARKERS that will show X tracking markers 
+
+tinySA Basic X = 2 or 4
+tinySA Ultra X = 2,4,6 or 8
+
+Next to this you can use MARKER/RESET MARKERS to show 1 tracking marker
+
+v1.4-95 2023-05-10 Ultra
+- LO output  added in config menu
+
+The LO output is through the CAL port and the level is between -20dBm and -15dBm when enabled.
+Keep in mind the LO frequency can be above or below the selected input frequency and the IF can change during scanning.
+When used to create a tracking generator it is advised to disable spur reduction and avoid scanning with a small span (< 5MHz)  as accurate tuning is done using the IF instead of the LO
+
+v1.4-91 2023-05-04 Ultra
+- The LO OUTPUT option is removed from the CONFIG menu as it did not do anything in the tinySA Ultra
+
+v1.4-90 2023-04-29 Ultra
+- Bug solved: deaf on some frequencies with small span
+- Improved accuracy when using FREQ COR
+- Bug solved: very slow scanning in direct mode.
+- Small speed increase, independent of FREQ COR
+
+v1.4-89 2023-04-27 Ultra
+- Show band center frequency when band width is less than 1/4 of screen width
+- Trigger interval less than 1s shown correctly
+- Show pop up when file loaded correctly
+There where some more errors reported but these take some more time to understand and solve
+
+v1.4-87 2023-04-26 Ultra
+WARNING: This release contains a large code change. Only use in non critical applications. Feedback welcome!
+- Added top level PAUSE menu option
+- Changed display grid to dot grid instead of line grid, this will be optional when I have space in a config  menu.
+- Added MARKER->CENTER to frequency menu
+- Large code change resulting in about 10% scan speed increase on 0-800MHz scan.
+
+v1.4-83 2023-04-13
+- Initial multi band range set equal to current range instead of 0,0
+- Marker number of digits displayed in shifted mode independent of frequency sign.
+
+v1.4-81 2023-04-11
+- Bug solved: Hang when using jog button when menu was open
+- Bug solved: Negative marker frequencies when shifted center to zero HZ not displayed correctly
+
+The first bug solution came from the NanoVNA-H4, can someone that reported this bug test if the hang is really solved?
+
+v1.4-79 2023-04-01
+- The job button now moves the marker in the correct direction when the screen is rotated
+
+v1.4-78 2023-03-30
+- AUTO NAME is off after a clear config
+- Frequency correction keypad now includes k and M modifiers
+
+v1.4-82 (77) 2023-03-27
+- Slow startup bug solved
+- Added config save/load from SD
+
+The config load will only succeed if the saved config is compatible with the current version.
+Sometimes, when a new config item is added, compatibility is broken, so a load may fail with a new FW version
+Config save/load includes all the correction tables
+
+v1.4-79 2023-03-25
+- Setting CONFIG/MORE/MINIMUM GRIDLINES to zero forces the grid to always be 10 lines starting at the start of the screen like used in some other spectrum analyzers.
+
+v1.4-76 2023-03-20 Ultra only
+- When in multipand mode and level triggering enabled the level line is now displayed and the triggering works. The trigger level menu shows "TRIGGER MULTI" to indicate the level has to be set in the multi band menu
+- The RBW is updated when a preset is loaded
+
+v1.4-72 2023-03-10
+- Trigger traces are numbered 1-4
+- You can only select none active traces as trigger trace
+- Once trigger is set to LEVEL the trigger trace is released
+
+It is still possible to go into the TRACE/CALC menu of a trace used as trigger trace causing all kind of interesting behavior
+Should a trace used as a trigger trace be block for manipulation in the TRACE menu?
+I think not as the TRACE menu allows you to do more advanced actions with a trigger trace. such as loading from SD card.
+
+v1.4-71 2023-03-09
+- Option added in the expert config menu to enable the display of the USA ham bands
+- Level trigger now allows to select a table trace as trigger level.
+
+Select LEVEL/TRIGGER/LEVEL and select either a fixed level of a trace. The selected trace will be set up as a table trace and a menu appears to edit the trace table.
+In combination with LEVEL/TRIGGER/BEEP you can do pass/fail testing with audio feedback 
+You can also set LEVEL/TRIGGER/NORMAL  to capture those signals that exceed the limit trace.
+
+From usability perspective this is all very new and probably there are some opportunities for improvement.
+
+Still to be done:
+- Add console commands to select what trace to use as limit trace instead of a fixed level
+- Add console command for the beep.
+- Add console command to alter the ham band table
+
+Question: When using a table trace as trigger level, should the trace be displayed with its native color or in blue to signal it is used as trigger level?
+
+v1.4-70 2023-03-06 Ultra only
+- Loading default settings or a preset should now set/reset multi band.
+- SPAN parameter added in IMD measurement. SPAN=zero gives old behavior, SPAN>zero activates multi band with the requested SPAN per harmonic.
+
+Testing of this new feature is welcome as only by using it the bugs will be found.
+
+v1.4-67 2023-02-28
+- Added a MULTI TRACE option to the MULTI BAND menu. Enabling this option will scan the bands in a consecutive traces instead of scanning all bands in one trace. WARNING: at least waterfall does not work in this mode but other problems may emerge
+
+The purpose of this release is to get feedback on this MULTI BAND feature. If you are not interested in this feature there is no need to install this new FW.
+
+    Is it MULTI BAND usable?
+    Where does it brake? (it will for sure brake certain features)
+
+v1.4-64 2023-02-25 Ultra only
+- Big number display repaired
+- Dashed trace with small spans in multi band mode repaired
+- LEVEL/SCALE can be set down to 0.1 (or 100m)
+
+v1.4-63 2023-02-24 Ultra only
+- Option to sound a beep when the trigger level is exceeded.
+- New measurement: MULTI BAND
+- Waterfall height reduced.
+
+The multi band measurement allows the definition of up to 8 bands to be scanned, each with a possible trigger level
+The active bands will be scanned in the order as listed.
+As the scanning is intended to be as fast as possible the RBW and display points are automatically optimized for speed depending on the span of the band.
+
+v1.4-50 2023-02-20
+- Max SAMPLE REPEATS increased to 10000
+
+This is particular useful for the 2.8" tinySA when doing cosmic noise measurements using a slow scan.
+In practice a sample repeat of 1000 may be high enough
+The tinySA Ultra is about a factor 10 slower so a sample repeat of 100 is probably enough.
+
+v1.4-49 2023-02-09
+- Max FM modulation frequency increased to 3.5kHz
+
+WARNING: above 2kHz the FM modulation is a square wave.
+
+v1.4-48 2023-02-08
+- Pushing jog button sideways at startup loads factory default config and settings and does not restore saved state.
+
+Remember that the saved config and startup settings are not cleared, only the loading is skipped.
+This is useful after a crash at boot or when you want to start with factory default config and settings.
+
+v1.4-46 2023-02-07
+- Repeat=10 is set during input curve editing for improved accuracy
+- Console command "correction out" added (2.8" only). This will dump the low output correction curve
+
+v1.4-44
+- Added output curve editing for the low output, see: https://tinysa.org/wiki/pmwiki.php?n=TinySA4.OutputCurveEdit
+As the high in/out does not have a step attenuator it wil not be possible to add a high output curve in any meaningful way.
+
+v1.4-43
+- Added CONFIG/MORE/LEVEL CORRECTION/IN LOW CURVE and IN HIGH CURVE menus
+The curve edit menu's work like the curve edit menu's in the tinySA Ultra, see: https://tinysa.org/wiki/pmwiki.php?n=TinySA4.InputCurveEdit
+For now only the input curves can be corrected.
+Make sure you have done a normal level calibration before editing the curves!!! This is also the case for the high input.
+Unlike the Ultra, there is no check if the calibration has been done.
+
+v1.4-42 2023-02-03
+- Corrected an error in the output level correction calculation
+- Added the relevant output curve editing options
+- Improved the menu names of the level correction menu
+
+v1.4-40 2023-01-13
+- Lever will change span after doing MARKER->CENTER
+- Updated input calibration tables (ULTRA only)
+
+v1.4-33 2023-01-06
+- Repaired 50Hz modulation output
+- LEVEL/TRIGGER/INTERVAL added. This will force the start of the sweep to happen at a multiple of the set interval. Set to zero to disable
+
+This is a test release of the INTERVAL function. I need some feedback on whether this makes sense.
+The limited resolution of the system timer makes it difficult/impossible to be exactly on the exact 1/60Hz  interval.
+On my tinySA the interval time is not fully correct and a somewhat larger time had to be specified.
+
+Is INTERVAL the right name for this function?
+Is TRIGGER_GRID better?
+Not sure if this will fit in the menu. I prefer a single word.
+
+v1.4-32 2023-01-05
+- With very high SAMPLE REPEAT on low RBW, touch stays responsive
+- (tinySA only) NFM changed to 3kHz deviation
+
+v1.4-31 2023-01-04
+- Reset PULSE HIGH before doing selftest or calibration.
+(This prevents a selftest or calibration  fail if PULSE HIGH was enabled)
+
+v1.4-30 2023-01-04
+- Added SAVE screen CAPTURE to STORAGE menu 
+- Added SAVE SETTINGS to STORAGE menu
+- Added SAVE TRACES to STORAGE menu
+- Changed some button text in the STORAGE menu
+
+SAVE TRACES saves all active traces in one CSV file.
+Using the TRACE/SD->TRACE function the first trace in a CSV file can be loaded back into a trace.
+
+v1.4-28 2023-01-02
+- Corrected too many digits in center freq menu
+- Repaired pre, mid and post trigger options.
+
+v1.4-26 2022-12-31
+- Output frequency display with increased digits.
+- Improved output level correction tables
+- Added warning when trying to set too high output level
+
+v1.4-8 2022-12-25
+- Added SD load/store trace table
+- Add SD load trace, this sets the span to the loaded trace and enables the trace
+
+v1.4-7 2022-12-25
+- Improved defaults for the touch parameters so after FW update you still can use the touch to activate menu's
+- Moved touch calibration points away from the corners of the screen.
+
+v1.3-564 2022-12-21
+- Added frequency to the BIG number display.
+
+v1.3-563 2022-12-14
+- Improve touch defaults so touch calibration is not needed after FW update
+- Marker ->Ref level now sets ref level to exact level of marker
+WARNING: this FW update will reset your presets and config.
+
+v1.3-559 2022-12-14
+- Removed slash in zero in medium font for better readability
+- Shifted touch cal points away from display edges
+- Added level checks during level calibration.
+
+v1.3-556 2022-12-11
+- Bug solved: UI for ultra correction table not working
+This also solves a similar bug for the ultra LNA table UI
+
+v1.3-555 2022-12-11
+- Bug fixed: after some time the tinySA Ultra hangs when scanning using the tinySA-App
+- Added menu STORAGE
+- Added option STORAGE/AUTO NAME to enable manual naming of files
+- Added STORAGE/LOAD CMD function to load and execute commands from sd card
+- Added STORAGE/LOAD BMO function to browse capture screens from sd card
+- Added CONFIG/MORE/EXPERT CONFIG/HARMONIC which makes it possible to set harmonic to 5 
+
+allowing the Ultra to reach 20.7GHz. All level calibration above 800MHz will be invalid after changing harmonic
+- Added option PRESET/SAVE STATE, when disabled the tinySA will always start with the range set in the STARTUP preset and not load the last used range.
+- Bug fixed: In clean output mode it is possible to set output frequencies above 4.4GHz
+
+Although some users have demonstrated that it is possible to see signals close to 18GHz, 
+the measured levels will be completely wrong and there is little dynamic range.
+
+v1.3-513 (512) 2022-12-10
+- Added SAVE STATE switch to PRESET menu. If disabled the last state not be saved over power cycle
+- Added LOAD DEFAULTS to PRESET menu. Restores all settings to their default values.
+
+v1.3-512 2022-12-03 Ultra only
+- Bug fixed: Ultramode not always working correctly after load preset.
+
+v1.3-510 2022-12-01 Ultra only
+- Time/Date added to status panel
+- Small change to prevent selftest 7 from failing incorrectly.
+
+v1.3-506 2022-11-28
+- Waterfall now works with calculated traces.
+Waterfall will display the first active trace with no calculation or, when none available, the first active 
+
+v1.3-504
+- Bug solved: Not possible to activate step attenuator in high input mode
+- Removed incorrect "Auto" button in level menu when in high mode.
+
+v1.3-501
+- help command now outputs correct string for connection to tinySA-App
+
+v1.3-429
+- Small increase of the vertical button size in the output menu by eliminating unused space
+- Added \n\r after output of help command
+
+v1.3-428
+- Remove 'M' before "Hz' in START frequency menu
+
+v1.3-422
+- Clearconfig now automatically performs a reset
+
+v1.3-347
+- Bug solved: Entering too many digits in combination with k,M or G postfix corrupts the input of integers
+
+v1.3-345
+- Removed wrong line under big number display
+- Added special fast scanning mode for noise sources
+The noise source scanning mode can be activated with DISPLAY/SWEEP ACCURACY/NOISE SOURCE and it reduces a full low input scan from 415ms to 118ms
+This mode should only be used in combination with a noise source as used for measurement of filters or attenuators as in this mode scanning is done like in a VNA and it is possible small bandwidth sources are not seen.
+Reducing the number of display points will further reduce the scanning time. Full range 101 points are scanned in 42ms. Great for tuning a filter.
+
+v1.3-338
+- Bug solved: Entering 12 digits and '-'  using a keypad hangs the tinySA
+- The flatness selftest is relaxed a bit
+For those that had a failed selftest 7 on flatness please retest using this new FW
+
+v1.3-337
+- Improved selftest
+As there are some very bad clones the selftest has been improved to detect one particular aspect that could lead to measurement errors in excess of 5dB
+If your tinySA now fails selftest 7 with this FW, please post a screenshot so I can judge if there is a need for further tuning of the pass/fail criteria.
+
+v1.3-336
+- Bug solved: Big number not visible on remote display
+- LO OUTPUT no longer visible in High Input mode
+- Delta markers no longer show dBmV or dBuV but dB
+- Big Number now shows units
+- Bug solved: Big number leaves rubbish after last character
+To make space for the unit text the big number size has been reduced a bit.
+Having dBmV or dBuV output in channel power requires a bit more time to change
+
+v1.3-335
+- Big number and waterfall are now mutually exclusive
+- Parameter help for most USB commands added
+- Marker USB command extended
+Example:
+ch> help
+config.ini commands: freq dac sweep_voltage saveconfig clearconfig zero pause resume caloutput save recall trace trigger marker usart_cfg vbat_offset color if actual_freq attenuate level sweeptime leveloffset levelchange modulation rbw mode spur load ext_gain output deviceid correction calc
+Other commands: version reset data frequencies scan scanraw sweep test touchcal touchtest usart capture refresh touch release vbat help info selftest threads
+Enter for more info: {command} ?
+ch> marker ?
+marker [n] [on|off|peak|delta|noise|tracking|trace|trace_aver|{freq}] [{index}|off|on]
+ch>
+
+v1.3-332
+- DISPLAY/LEVEL METER renamed to DISPLAY/BIG NUMBER
+- Improved font
+- Most measurement functions now also can show their main output as a big number
+
+v1.3-331
+- DISPLAY/LEVEL METER option added to show BIG letter marker info
+
+v1.3-330
+- Bug solved: Remote control does not react to mouse click
+
+v1.3-229
+- Bug solved: After restoring in high mode menu's are inconsistent
+- Bug solved: After restoring to output mode the MODE button goes back to the main menu
+
+v1.3-325
+- After power off/on the last used sweep range is automatically restored.
+Only the sweep range is restored after power off/on, all other settings are loaded from the startup preset.
+This automatic save/restore does not cause any wear of the internal flash memory as battery powered backup registers are used
+There is some more space for extra settings to be saved and restored. Let me know what settings you prefer?
+Examples: Attenuation, ref level, RBW, mode, output level
+
+v1.3-320 2021-10-29
+- Added a '+' sign to the indicated output level in high output mode when the level is above 0dBm.
+A small cosmetic change to warn users about the possibly high output levels when in high output mode.
+
+v1.3-317
+- Bug solved: Setting the actual input level gives wrong leveloffset
+
+v1.3-313 
+Added trace command
+
+v1.3-265
+- Bug solved: waterfall not updated after load preset with waterfall
+- Changed level calibration method.
+- Added marker attribute: trace average. Calculates the marker value by averaging over the whole trace.
+- Level and frequency step buttons more reactive (Thanks DiSlord)
+- Less display flicker when using sliders (Thanks DiSlord)
+- Faster menu updating (Thanks DiSlord)
+
+v1.3-206 2021-05-28
+- Improved number formatting during keypad entry (thanks to DiSlord)
+- Minus sign will always change sign of input, when you enter "1234-" you get "-1234".
+- Improved output linearity at low output levels (below -37dBm) with new HW versions.
+- Removed some hidden test code
+The FW update will reset your configuration.
+
+v1.3-165 2021-05-26
+- Each delta marker has an own reference marker
+- Delta markers can refer to a marker on a stored trace
+- Level triggers require only one measurement opposite trigger level for better catching very short signals
+- Clearconfig command added to expert config menu
+
+v1.3-111 2021-05-14
+- Proportional menus, height of buttons depends on content (thanks DiSlord) This makes space available for future new functions
+- Preset restore buttons show start/stop frequency
+- Disable measurement after LINEARITY also removes green line
+- Switching from one measurement type directly to another measurement type does not leave artifacts on screen
+
+v1.3-86 2021-05-07
+- None, only rebuild to try to eliminate the startup bug some people are experiencing.
+
+v1.3-80 2021-05-06
+- Added expert setting: PULSE HIGH
+When enabled the high output will pulse at the start of a low input sweep
+WARNING: when enabled the cal output will not output the selected frequency.
+No more need for sensing the LED output
+
+v1.3-29
+- The USART serial interface is can be enabled in the expert config menu. All USB serial commands are also available over the USART serial interface.
+Go to CONFIG/EXPERT CONFIG/MORE/MORE/CONNECTION for a new submenu with 3 options:
+    USB selects the USB connection for the serial console
+    SERIAL selects the USART serial port for the serial console
+    SERIAL SPEED enables the setting of the speed of the serial interface.
+The serial speed can be set to 19.2k, 38.4k, 57.6k, 115.2k, 230.4k, 460.8k and 921.9k.
+The serial interface signals are available as PCB edge pin header mounting holes marked GND, RX, TX. The VDD pin can be used to supply a serial conversion module, absolute maximum current supplied by VDD is 100mA but high currents may  make tinySA perform worse.
+WARNING 1:
+There is NO flow control on the serial interface. Its easy to lose characters.
+WARNING 2:
+The TX/RX signals are implemented as 3.3V TTL serial signals. Any voltage outside the 0-3.3V range will immediately destroy your tinySA
+WARNING 3:
+The CONNECTION settings are saved as part of the configuration using a saveconfig command. There is NO autosave of these settings.
+WARNING 4:
+The serial interface takes a fair amount of memory. It is not guaranteed all future releases will have the serial interface enabled. Do check before upgrading.
+
+v1.3-24 2021-04-27
+- BUG solved: In high mode with external gain at -60 and a span of 10MHz weird artifacts appear and the mirror masking is no longer working
+
+v1.3-23 2021-04-25
+- Quick button for CALC menu added. Touch at or above the battery icon to activate the CALC menu
+- Calc buttons now restart calculation when clicked again
+- Internal optimizations to free code space for future new features (thanks DiSlord for the biggest improvement!)
+Two small changes to make it easier to do measurements using the CALC menu.
+Example: Clicking MAX HOLD when MAX HOLD is already active now restarts the max hold.
+Same for all other calculations
+The optimizations could have introduced new bugs which I did not yet see during my testing.
+
+v1.3-17
+- Bug fixed: Level sweep is not continuous and outputs wrong levels
+- Command CONFIG/EXPERT CONFIG/ACTUAL POWER/OUTPUT LEVEL added
+The OUTPUT LEVEL command sets the tinySA in low output mode at 30MHZ, -25dBm and activates an input keypad.
+After measuring the output level you can enter the measured level using the keypad.
+Any difference between set (-25dBm) and actual level will be corrected using the entered value.
+Entering no input ( <- key) or -25 will leave the correction unchanged.
+The previous ACTUAL LEVEL command is renamed to INPUT LEVEL, also under the ACTUAL POWER sub menu
+
+v1.3-13 2021-04-17
+- Bug solved: The UI becomes sluggish with very long sweep times
+- Bug solved: The value of a reference marker on a stored trace seems to come from the actual trace.
+
+v1.3-5 2021-04-06
+- switched SPUR REDUCTION and FREQ SHIFT in the menu's
+- Any frequency can be used as actual START/CENTER as long END frequency displayed is below 4.29GHz and START freq displayed is not negative.
+
+v1.3-4 2021-04-01
+- Added frequency shift option
+This requires a bit of explanation. The user interface is experimental and I can use some feedback if it makes sense.
+A new option under CONFIG/FREQ SHIFT allows the entering of the actual CENTER or START frequency (depending on the active scan mode) in case you are using a frequency translation ahead of the tinySA input.
+The maximum frequency is 2GHz due to limited bit width. Too high frequencies will output garbage
+To disable the shift click again on  CONFIG/FREQ SHIFT
+Once shifted all input/output of frequencies should be shifted with the indicated frequency
+The console commands and console output are NOT influenced by a frequency shift!
+
+Does this make sense? Or is it better to enter an offset? But how to do?
+Did I forgot to "shift" a frequency somewhere on the output?
+Is the location under CONFIG correct? Or shall I remove FREQ/ZERO SPAN and put it under FREQ/SHIFT FREQ? Or move FREQ/SPUR REDUCTION to CONFIG?
+Is the limitation to 2GHz a problem?
+
+v1.3
+- The status of the last self test is now correctly updated after finishing
+- The delta markers have the same color as the trace
+- The stored trace markers changed color to green.
+
+v1.2-99
+- Markers now can have the attribute STORED that will put them on the stored trace.
+This is a rather new feature, not fully tested so you may get all kind of terrible errors. Don't use if your tinySA is mission critical.
+If you enable the MARKERS/MODIFY MARKERS/STORED the marker will be place on the stored trace and it will get its value from the stored trace.
+Useful if you want to compare a level in a stored trace with the latest measurement.
+
+v1.2-86
+- Changed channel power indicator from "dB" to "dBm"
+
+v1.2-85
+- offset command changed to ext_gain
+- EXTERNAL AMP menu item changed to EXTERNAL GAIN
+- Bug solved: Overload detection and auto attenuate don't work correctly when external gain is set.
+
+v1.2-83
+- Added MEASUREMENT/CHANNEL POWER
+- Added DISPLAY/LIMITS
+Channel power allows the measurement of the in-channel power, both in dBm and in % of Watt (of the total power in the scan) and to compare those numbers with the adjacent channels
+Below measurement is Channel frequency 30MHz and Channel width 30kHz. total scan span is set to 3 times the channel width
+
+v1.2-82
+- Bug solved: dBmV and dBuV displayed incorrectly on graph
+
+v1.2-81 2021-03-14
+- Bug solved: Calibration sometimes fails
+- The audio output is moved to a different pad. See: https://tinysa.org/wiki/pmwiki.php?n=Main.Listen
+For those that already made the audio output connection be aware the output has changed to another pad.
+The wiki picture is updated accordingly.
+
+v1.2-78
+- The complete UI (not the sweeping) keeps working when in Listen mode, thanks to suggestion from DiSlord.
+- Switching of LISTEN is done by clicking LEVEL/LISTEN again. The LISTEN button has a checkmark to show it is in LISTEN mode
+Now you can use both touch and toggle switch to move the marker when in listen mode
+For information: The audio output is strong enough to drive a headphone without external amplifier. If needed for volume remove the 10k to ground and replace the remaining 10k with 4.7k
+
+v1.2-77 2021-03-12
+- Listen function added
+
+v1.1-67 2021-03-10
+- Console command added: calc. Switches to one of the calculation modes or disables calculation
+- Improved modulation frequencies. Make sure you do a clearconfig after updating the FW
+
+v1.2-65
+- Bug solved: The AM and FM modulation frequencies are too high
+After the speed optimizations the modulation frequency setting was incorrect for higher frequencies. This has been corrected
+This FW update will reset your config settings.
+
+v1.2-61 2021-03-07
+- Trigger trace color corrected (thanks DiSlord)
+
+v1.2-60 2021-03-07
+- Many many speed and code optimizations by DiSlord (thanks!!!!)
+- Bug solved: High output can not be set below -5dBm output
+Due to the many changes you may need to redo your input/output level calibrations
+
+v1.2-51 2021-03-06
+- Added remote desktop function
+
+v1.2-49 2021-03-05
+- Bug solved: The low output level changes with twice the value set in the levelofset low output command
+- When one of the calculation modes is active the waterfall is taken from the live trace (red) instead of the calculated trace(yellow)
+
+v1.2-40 (-41) 2021-03-04
+- Various slider and form menu bugs repaired
+- Leveloffset command extended with "leveloffset switch" to correct output level  errors below -50dBm in low output mode.
+
+The leveloffset command is described here: https://tinysa.org/wiki/pmwiki.php?n=Main.USBInterface
+As there where a number of errors due to the code cleanup this release can also have some new errors
+
+v1.2-38 2021-03-04
+- Bug solved: In output mode the battery icon disappears when clicking any button
+- More responsive touch screen (DiSlord)
+A lot of code cleaning going on. This release may introduce some new bugs so do not use if your tinySA is mission critical.
+
+v1.2-1 2021-02-28
+- Bug fixed: wrong levels in tinySA-App
+- Bug fixed: Selftest fails incorrectly
+
+v1.2 2021-02-28
+- Many things have changed due to big code cleanup. Do not use this release if you can not accept some new bugs.
+- Bug solved: When stepping towards 960MHz the output freq suddenly jumps to 940MHz instead of 960MHz
+- Bug solved: The colors of the waterfall do not start at the darkest color
+- Bug solved: Low output level sweep no longer sweeps full span.
+This release will restore your config settings to factory defaults. You may have to redo the touch calibration.
+As indicated this release is based on a lot of changed code so it may introduce some new bugs.
+
+v1.1-94
+- Added a burst/pulse from the high output at the start of a low output sweep
+
+v1.1-91 2021-02-21
+- Added output of sweep voltage(0-3.3V)
+
+v1.1-88 2021-02-17
+- The spurs caused by the 48MHz MCU clock have been reduced.
+- The scanraw command progress is displayed using the green progress bar.
+
+tinySA-App uses the scanraw command and with a large number of points and a low RBW it often is not obvious if the tinySA is still  scanning or how long  it would take till the end of the scan. The green progress bar give better insight in scanraw progress.
+
+The mechanism used to reduce the MCU spurs makes some assumptions which I would like to see verified by some users.
+Can some of you test this using the console command:
+selftest 6
+In reply you get a list of frequencies.
+I'm interested in the frequencies listed after 12 to 20
+This is what I get.
+12:   94.602M
+13:   94.989M
+14:   95.377M
+15:   95.764M
+16:   96.069M
+17:   96.456M
+18:   96.844M
+19:   97.231M
+20:   97.536M
+
+v1.1-86 2021-02-13
+- Level inc/dec keys now work correctly when an External AMp setting is active
+
+v1.1-85 2021-02-08
+- Battery indicator added to output menu
+- Attenuation will decrease when auto attenuation is on and no maximum is found.
+
+The second change solves the problem where no signal is visible when attenuation is at maximum and the tinySA refuses to automatically decrease attenuation because it does not see any signal.
+
+v1.1-82 2021-02-03
+- Solved a hang up when trying to change level or frequency when modulation was active.
+
+v1.1-80 2021-02-01
+- The Low output level button is split in 4 quick up/down buttons and a "set" button to activate the keypad. The slider works as before
+- The Output Freq button is split in 4 quick up/down buttons and a "set" button to activate the keypad. The slider works as before and the up/down buttons take their value from the set "RANGE" (use long touch away from slider as before)
+
+These changes are especially convenient for those that use the tinySA in output mode and are used to physical up/down buttons.
+The very small text indicates the change when touching above the small text and touching above "set" activates the keypad as previously.
+
+v1.1-77 2021-01-20
+- MEASURE/MORE/LINEAR added
+The linearity test requires an input signal between -40dB and -25dB and a single marker positioned on that signal.
+Activating the linearity test will step the built-in attenuator through all attenuation values and draw a green line on the screen at the measured signal level.
+If all goes well the line should be flat within +/- 1dB with an occasional measurement deviating due to interference/noise
+The test also helps in getting confidence about the 1dB compression point of the tinySA. This can be measured by applying a signal of 0dB and activating the MEASURE/MORE/LINEAR test
+The compression starts when attenuation is below 5dB and is visible in the green line being curved down a bit at the right side.
+
+v1.1-76 2021-01-18
+- Corrected the bug that caused a hang after a failing display test.
+The display test is no longer the first test but test 11.
+Test 12 is now the attenuator test and it will take some time so wait for it to finish
+
+v1.1-75 2021-01-17
+The error in the NFM and FWM carrier frequency has been corrected
+
+v1.1-74 2021-01-13
+The first test in the selftest is preceded with a full display write/read test that should catch simple serial communication and display RAM errors.
+
+v1.1-72 2020-12-25
+Removed stop/start when moving the frequency slider in output mode
+
+v1.1-70
+Solved preset store/load bug
+Slider long touch now sets total span
+
+v1.1-68
+Set text to STEP when in long touch step setting mode
+Increased freq slider pickup width
+Small frequency slider improvements
+
+v1.1-66
+Added high output level slider and improved level slider behavior
+
+v1.1-65
+Added low output level slider
+
+v1.1-61
+Frequency slider added in output mode
+
+v1.1-59 2020-12-20
+- Added external amplification/attenuation setting in output mode 
+- Self test extended
+- Bottom quick menu bug solved
+- THD info marker overlap bug solved 
+- Pre, Post and Mid trigger options added to trigger menu
+
+v1.1-55
+THD info marker overlap bug solved
+
+v1.1-54
+Pre, Post and Mid trigger options added to trigger menuv1.1-59-ge430685:
+Added external gain/attenuation setting in output mode
+Selftest extended
+Bottom quick menu bug solved
+
+v1.1-52
+Solved hang after selftest when tinySA-App was active
+
+v1.1-51
+Small change to selftest to avoid spurs
+
+v1.1-50
+More code squeezing
+
+v1.1-49
+Corrected touch cal bug
+Quickmenu for frequency added. Touching mid bottom switches between CENTER/SPAN and START/STOP
+
+v1.1-48
+Quickmenu added to marker info.
+
+v1.1-45
+Added adaptive spacing to optimize status panel use
+
+v1.1-41
+Added quick menu
+
+v1.1-40
+Spur removal bug solved
+
+v1.1-31 2020-11-17
+- Bug solved: modulation console command does not work.
+
+v1.1-26 2020-11-11
+- Bug solved: tinySA crashes when waterfall enabled and scanraw requested
+- Added  MARKER/MARKER OPS/ -> REF LEVEL sets the ref level to manual just above the level of the selected marker
+
+v1.1-23 2020-11-08
+- MEASUREMENT/FM now measures the actual frequency deviation for modulation frequencies between 1kHz and 2.5kHz and deviations from 3kHz to 500kHz 
+- Improved touch calibration markers
+- actual 10MHz frequency correction value now stored in config and saved over reboot(this implies your current config will be erased when you upgrade to this FW). Be careful. Entering a WRONG frequency will render a tinySA useless and will require a restore factory settings.
+- Marker center zoom now also works for a dragged or searched marker (e.g. when the marker is not in tracking mode) as long as the marker is positioned on a (local) maximum
+- Exiting measurement no longer resets all settings
+
+v1.1-22 2020-11-07
+- After MARKERS/MARKER OPS/->CENTER the tinySA goes into auto-center-mode as long as you do NOT use any menu and the lever is automatically set to zoom-span-mode
+
+v1.1-21 2020-11-06
+- Automatically detect AM signal and adapt settings
+
+WARNING: This is an experimental feature and I need your opinion
+
+When the span is below 300kHz and the signal above -40dBm AM auto detection is active. Once it detects an AM signal it will activate special AM mode.
+A red "AM" warning will appear in the status panel and the AGC/LNA setting will be optimized for AM signals
+This mode is canceled when the max signal is below -40dBm and the warning text disappears, otherwise it will stay on even when the signal is no longer AM modulated!
+Everytime a new setting is applied by the user the AM mode is canceled and auto detection will restart.
+
+As a consequence the first sweep after any change of settings will NOT be optimized for AM and can show the well known AM modulation artifacts. Once detected, the next sweep should be OK.
+Incorrect AM detection may be possible and I need to know under what conditions this is happening.
+
+As stated, highly experimental and I probably missed some side effect somewhere. Your testing and feedback is most welcome.
+
+v1.1-15 2020-11-02
+- The AM measurement mode now calculates the modulation depth based on the two sideband markers.
+- The -3dB width measurement is made more robust and accurate
+
+A small warning w.r.t the AM depth measurement. Below 40% depth the measurement reports too high values and below 30% depth the measurement may fail completely.
+But as I assume people measuring the modulation depth of an AM signal are supposed to understand how the calculation works, I hope this is not a serious issue.
+
+v1.1-13 2020-10-27
+- Added a check and error message when no connection between present between high and low connector
+
+v1.1-11 2020-10-17
+- Selftest extended with attenuator test testing all attenuator internal switches. 
+
+v1.1-9 2020-10-07
+- Disabled serial console due to insufficient space
+- Added THD measurement so MEASUREMENT/MORE menu
+
+The THD measurement gives the % TDH of the signal that is under the first marker by summing the power of all harmonics of the signal under the first marker in the current scan
+The maximum number of harmonics you can take into account is about 30 so with a full span in low mode you can measure the THD of the cal output at 15MHz and 30MHZ but not 10MHz or lower.
+For lower frequencies reduce the span till the THD measurement appears.
+
+v1.1-7 2020-10-06
+- Serial port integrated
+- Offset console command added to support External Amp setting from tinySA-App
+
+v1.1-5 2020-10-02
+- Solved a crash in the frequency menu
+- Corrected various errors in FM modulation. (shifting, wrong deviation)
+
+FM modulation should now work correctly for both low and high mode over the entire frequency range.
+Be aware: In low mode around 46MHz and in high mode around 480MHz the fm modulation way deviate a bit due to complex PLL switching.
+
+v1.1-4 2020-09-30
+- The AM modulation depth increased to 30%
+- NFM deviation increased to 5kHz
+- Modulation frequency limits set to 100Hz..6kHz
+
+v1.1-2 2020-09-29
+- The console command "Marker {number} {value}" now accepts either a index (if below sweep points) or frequency as value
+
+Examples:
+>marker 1 100
+sets marker 1 to index 100 (if sweep points > 100)
+>marker 1 100M
+sets marker 1 to 100M (if within sweep range)
+
+If frequency is outside sweep range nothing happens.
+Setting the marker to an index or frequency disables tracking
+
+v1.1 2020-09-28
+- Add option to set the AM or FM modulation frequency. 
+- Option to directly set the frequency of a marker instead of searching or moving
+- Clean menu when switching to waterfall
+- Waterfall now working for all sweep points settings
+
+The modulation frequency can be set over a broad range but is only fairly accurate (+/- 1%)  between 100Hz and 7kHz
+
+v1.0-99 2020-09-24
+- Waterfall now also works for 101 and 51 sweep points
+- Bottom level indicator removed in waterfall mode
+- Menu remainder cleared in waterfall mode
+- New MARKER/MARKER SEARCH/ENTER FREQUENCY to set active marker to specific frequency
+
+v1.0-96 2020-09-23
+- Waterfall now can be in 3 states: off, small and big.
+- New expert config options: set minimum horizontal gridlines
+- New expert config options: display HAM bands
+- Dragging a marker switches off the tracking attribute
+
+v1.0-86 2020-09-15
+- Added a frequency per division indicator at the bottom
+- Increased the minimum number of frequency grid lines to be shown v1.0-49 2020-08-04
+- Corrected a rounding error in the level calibration causing up to 1dB level error
+
+v1.0-84 2020-09-14
+- Added 4 measurement functions: SNR, -6dB width, AM and FM
+
+See the video demonstrating these new options starting here: https://youtu.be/ioM0Si3qI-Y?t=626
+
+As I am no measurement expert I made some liberal use of names.
+
+    SNR can be used to measure the difference between a signal and the noise floor
+    -6dB width can be used to measure the width of an occupied frequency band.
+    AM does some careful AGC/LNA setting optimization to help observe AM modulation
+    FM does a quick setting to observe FM modulation.
+
+v1.0-82 2020-09-11
+- Restoring a preset that uses a different mode is working again.
+
+Be aware that part of a preset is the stored trace. So if you want to keep a measurement for a long time (e.g. survive a power cycle or an empty battery) do a STORE TRACE and after that STORE into a preset.
+Once you do a LOAD the stored trace will appear again.
+
+v1.0-81 2020-09-10
+- Corrected a number of marker frequency bugs.
+
+v1.0-80 2020-09-09
+- Fixed a crash when touching in empty space below an active menu
+- Improved auto level handling, tell me if you notice any unwanted difference
+- STORE STARTUP is now used at startup. This could cause problems with starting the tinySA. Let me know it you experience startup problems.
+
+v1.0-77 2020-09-08
+- Show "Mask: ON" in status panel when mirror masking is active
+- Take high mode input attenuation into account when overriding AGC or doing mirror masking
+
+v1.0-69 2020-09-04
+- Removed the modulation interruption causing a rather unpleasant sound
+
+During one of the recent code changes a bug was introduced that caused the modulation to be interrupt a couple of times per second which made the modulation rather unpleasant to listen to.
+
+v1.0-67
+- Updated spur avoidance table
+
+After receiving some feedback about possible spurs I made an update of the spur avoidance table
+This update could make the scanning a little bit slower.
+
+v1.0-64 2020-08-30
+- Removed the 2.4kHz auto RWB setting
+
+A youtube reviewer discovered the manual 3kHz RBW provided better narrow span results compared to the automatic 2.4kHz RBW so I removed the 2.4kHz RBW
+
+v1.0-63 2020-08-30
+- The target maximum level for the auto attenuation is changed from -20dBm to -30dBm
+
+In one of the user videos I noticed that, when not very familiar with the inner workings of a spectrum analyzer and relying on the auto attenuation functionality, it is important to ensure minimum internally generated harmonics.
+This changed setting will raise the noise floor with 10dB with stronger signals but those that know what they are doing and in need of a low noise floor and not concerned about possible internal generation of harmonics can always switch  to manual attenuation.
+
+v1.0-62 2020-08-29
+- Bug solved: trace store command not working
+- Bug solved: Overload flashes in normalized mode
+- Normalize activation now asks for reflevel and sets reflevel to manual
+- save/recall [id] command added, does store/load of preset (yes, confusing....)
+
+v1.0-61 2020-08-26
+- After a marker search using the menu, a marker can be moved to any position using the lever.
+- When the sweep is paused you can directly select a marker as active marker by touching the marker info and this is reflected in the marker info
+
+v1.0-58 2020-08-24
+- Added MARKER/SEARCH MARKER/PEAK SEARCH which disables the tracking attribute of the active marker and positions the active marker as the global maximum level
+- Corrected a small error in marker search which could cause a 0.5dB error in finding a maximum or minimum
+
+This search option is useful to quickly find a global maximum, even if this maximum is less than the NOISE LEVEL above the surrounding signals
+Be aware a possible zero Hz peak is not automatically excluded in the search, to avoid, set the start frequency of the sweep to an appropriate value.
+
+v1.0-49 2020-08-04
+- Corrected a rounding error in the level calibration causing up to 1dB level error
+
+Due to a data format change you will lose your configuration information. If you have made any changes you should redoc these after updating.
+Both high and low mode level calibration should be re-done using either the built-in calibration source or an external known level signal.
+The calibration error off factory should be less then 2dB so after this FW update your levels should be within 2dB without calibration.
+
+v1.0-39 2020-07-25
+- Small change to increase the robustness of tinySA.exe during screen capturing.
+- Better status display of trigger status (ARMED/PAUSED)
+- Corrected a help text typo (IN to OUT -> HIGH to LOW)
+
+v1.0-37 2020-07-24
+- completed the 3D conversion with radio buttons and checkmarks (DiSlord)
+- Now 51,101, 145 and 201 scan points possible
+
