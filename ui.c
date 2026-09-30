@@ -5590,10 +5590,16 @@ static const menuitem_t menu_storage_sd_icon[] = {
   { MT_NONE,         0,       NULL,                menu_back }
 };
 
-static const menuitem_t menu_storage_config[] = {
+static const menuitem_t menu_storage_more[] = {
   { MT_ADV_CALLBACK, 0,       "AUTO NAME",              menu_autoname_acb },
   { MT_ADV_CALLBACK, 0,       "MHz\nCSV",               menu_mhz_csv_acb },
   { MT_SUBMENU,      0,       "SD CARD\nICON",          menu_storage_sd_icon },
+#ifdef __USE_USB_MSC__
+  { MT_CALLBACK,     0,       "USB\nDISK",              menu_usb_disk_cb },
+#endif
+#ifdef __SD_FIRMWARE_UPDATE__
+  { MT_CALLBACK, FMT_BIN_FILE,"UPDATE\nFIRMWARE",       menu_sdcard_browse_cb },
+#endif
   { MT_NONE,         0,       NULL,                     menu_back }
 };
 
@@ -5608,13 +5614,7 @@ static const menuitem_t menu_storage[] = {
   { MT_CALLBACK,    FMT_PRS_FILE,   "SAVE\nSETTINGS",       menu_sdcard_cb},
   { MT_CALLBACK,    FMT_CFG_FILE,   "SAVE\nCONFIG",         menu_sdcard_cb},
   { MT_CALLBACK,    FMT_CSV_FILE,   "SAVE\nTRACES",         menu_save_traces_cb},
-#ifdef __USE_USB_MSC__
-  { MT_CALLBACK,    0,              "USB\nDISK",            menu_usb_disk_cb},
-#endif
-#ifdef __SD_FIRMWARE_UPDATE__
-  { MT_CALLBACK,    FMT_BIN_FILE,   "UPDATE\nFIRMWARE",     menu_sdcard_browse_cb},
-#endif
-  { MT_SUBMENU,     0,              "CONFIG",               menu_storage_config },
+  { MT_SUBMENU,     0,              S_RARROW" MORE",        menu_storage_more },
 //  { MT_KEYPAD,      KM_INTERVAL,    "INTERVAL\n\b%s",       NULL },
   { MT_NONE,    0, NULL, menu_back} // next-> menu_back
 };
