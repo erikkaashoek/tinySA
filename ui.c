@@ -7622,6 +7622,12 @@ ui_mode_normal(void)
   ui_mode = UI_NORMAL;
 }
 
+int
+is_ui_normal_mode(void)
+{
+  return ui_mode == UI_NORMAL;
+}
+
 static void
 lever_move_marker(int status)
 {

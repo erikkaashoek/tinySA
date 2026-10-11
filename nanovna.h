@@ -593,7 +593,7 @@ extern  uint16_t _grid_y;
 #define GRIDY  _grid_y
 extern uint16_t graph_bottom;
 #ifdef TINYSA4
-#define SUPER_WATERFALL  90
+#define SUPER_WATERFALL  50   // larger waterfall: graph gets ~50 px, waterfall gets ~260 px
 #define BIG_WATERFALL   180
 #define SMALL_WATERFALL 240
 #define BIG_NUMBER_SPACE BIG_WATERFALL
@@ -1603,6 +1603,7 @@ void set_numeric_value(void);
 
 void ui_mode_normal(void);
 void ui_mode_menu(void);
+int is_ui_normal_mode(void);
 void menu_push_lowoutput(void);
 void menu_push_highoutput(void);
 void menu_move_top(void);

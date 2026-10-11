@@ -1396,7 +1396,7 @@ draw_all(bool flush)
     draw_all_cells(flush);
 #ifdef __SCROLL__
   //  START_PROFILE
-  if (setting.waterfall && !(redraw_request & REDRAW_INBETWEEN))
+  if (setting.waterfall && !(redraw_request & REDRAW_INBETWEEN) && is_ui_normal_mode())
     update_waterfall();
   //  STOP_PROFILE
 #endif
@@ -2174,6 +2174,10 @@ int display_test(void)
 #include "waterfall.c"
 #endif
 
+#ifdef TINYSA4
+static void draw_waterfall_time_labels(int w_width);
+#endif
+
 static void update_waterfall(void){
   int i = CHART_BOTTOM-1;
   int w_width = area_width < WIDTH ? area_width : WIDTH;
@@ -2213,7 +2217,7 @@ static void update_waterfall(void){
   for (i=0; i< sweep_points; i++) {			// Add new topline
     uint16_t color;
 #ifdef _USE_WATERFALL_PALETTE
-    uint16_t y = _PALETTE_ALIGN(255 - graph_bottom + index[i]); // should be always in range 0 - graph_bottom
+    uint16_t y = _PALETTE_ALIGN((index[i] * 255) / graph_bottom); // normalize to full palette regardless of graph height
 //    y = (uint8_t)i;  // for test
     if (y > 255)            // at start the index_y_t table could be empty leading to negative y
       break;
@@ -2260,8 +2264,121 @@ static void update_waterfall(void){
     }
   }
   ili9341_bulk(OFFSETX, graph_bottom, w_width, 1);
+#ifdef TINYSA4
+  draw_waterfall_time_labels(w_width);
+#endif
 //  STOP_PROFILE;
 }
+
+#ifdef TINYSA4
+#define WATERFALL_LABEL_MAX_CHARS   5   // e.g. "-105s" or "-999s"
+#define WATERFALL_LABEL_SLOT_W      28  // enough for 5 chars plus tiny margin
+#define WATERFALL_LABEL_SLOT_H      8   // FONT_STR_HEIGHT
+#define WATERFALL_LABEL_MAX_SLOTS   6
+
+struct waterfall_label_slot {
+  int x;
+  int y;
+  bool valid;
+  pixel_t pixels[WATERFALL_LABEL_SLOT_W * WATERFALL_LABEL_SLOT_H];
+};
+
+static struct waterfall_label_slot wf_label_slots[WATERFALL_LABEL_MAX_SLOTS];
+
+// Restore the waterfall pixels behind a label that has scrolled down by one
+// sweep, erasing the old text without using a background strip.
+static void restore_waterfall_label(const struct waterfall_label_slot *slot)
+{
+  int h = WATERFALL_LABEL_SLOT_H;
+  if (slot->y + 1 + h > CHART_BOTTOM)
+    h = CHART_BOTTOM - (slot->y + 1);
+  if (h <= 0)
+    return;
+  // Copy saved pixels into the global SPI buffer and blast them to the LCD.
+  memcpy(spi_buffer, slot->pixels, WATERFALL_LABEL_SLOT_W * h * sizeof(pixel_t));
+  ili9341_bulk(slot->x, slot->y + 1, WATERFALL_LABEL_SLOT_W, h);
+}
+
+// Draw time-history labels as true overlays inside the waterfall area for
+// BIG/SUPER modes.  Before drawing each label the current waterfall pixels are
+// saved; on the next sweep those saved pixels are restored at y+1, erasing the
+// old text before it can scroll down and leave a trail.  This keeps the full
+// waterfall width intact and works in both normal and rotated orientations.
+static void draw_waterfall_time_labels(int w_width)
+{
+  if (setting.waterfall != W_BIG && setting.waterfall != W_SUPER)
+    return;
+
+  int height = CHART_BOTTOM - graph_bottom;
+  if (height <= 0 || setting.actual_sweep_time_us == 0)
+    return;
+
+  // Total history covered by the waterfall, in milliseconds.
+  uint32_t max_time_ms = (uint32_t)height * setting.actual_sweep_time_us / ONE_MS_TIME;
+  if (max_time_ms < 500)               // less than 0.5 s of history
+    return;
+
+  // Pick a label step that yields a reasonable number of labels.
+  static const uint32_t steps_ms[] = {
+    100, 200, 500, 1000, 2000, 5000,
+    10000, 15000, 30000, 60000, 120000, 300000, 600000
+  };
+  uint32_t step_ms = steps_ms[0];
+  int step_count = sizeof(steps_ms) / sizeof(steps_ms[0]);
+  for (int i = 0; i < step_count; i++) {
+    step_ms = steps_ms[i];
+    if (max_time_ms / step_ms <= 6)
+      break;
+  }
+
+  // Place the label slot at the right edge of the active waterfall width.
+  int slot_x = OFFSETX + w_width - WATERFALL_LABEL_SLOT_W;
+  if (slot_x < OFFSETX)
+    slot_x = OFFSETX;
+
+  // First erase old labels that scrolled down one line in the previous sweep.
+  for (int s = 0; s < WATERFALL_LABEL_MAX_SLOTS; s++) {
+    if (wf_label_slots[s].valid)
+      restore_waterfall_label(&wf_label_slots[s]);
+    wf_label_slots[s].valid = false;
+  }
+
+  ili9341_set_foreground(LCD_FG_COLOR);
+
+  int slot = 0;
+  for (uint32_t t_ms = step_ms; t_ms < max_time_ms && slot < WATERFALL_LABEL_MAX_SLOTS; t_ms += step_ms) {
+    int offset = (int)((uint32_t)t_ms * ONE_MS_TIME / setting.actual_sweep_time_us);
+    int y = graph_bottom + offset;
+    if (y < graph_bottom || y + WATERFALL_LABEL_SLOT_H > CHART_BOTTOM)
+      continue;
+
+    // Save the waterfall pixels that will be overwritten by this label.
+    wf_label_slots[slot].x = slot_x;
+    wf_label_slots[slot].y = y;
+    ili9341_read_memory(slot_x, y, WATERFALL_LABEL_SLOT_W, WATERFALL_LABEL_SLOT_H, wf_label_slots[slot].pixels);
+    wf_label_slots[slot].valid = true;
+
+    char buf[12];
+    uint32_t t_s = t_ms / 1000;
+    if (t_s < 1000)
+      plot_printf(buf, sizeof(buf), "-%ds", (int)t_s);   // 15 s increments stay in seconds
+    else
+      plot_printf(buf, sizeof(buf), "-%dm", (int)(t_ms / 60000));
+
+    // Right-align the text inside the slot.
+    int text_w = 0;
+    for (const char *p = buf; *p; p++)
+      text_w += FONT_GET_WIDTH(*p);
+    int text_x = slot_x + WATERFALL_LABEL_SLOT_W - text_w - 1;
+    if (text_x < slot_x)
+      text_x = slot_x;
+
+    ili9341_drawstring(buf, text_x, y);
+    slot++;
+  }
+}
+#endif
+
 #if 0
 //extern float peakLevel;
 //extern float min_level;
