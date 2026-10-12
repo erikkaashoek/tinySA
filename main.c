@@ -2801,6 +2801,7 @@ static void shell_init_connection(void) {
  *  Set I/O stream (SDU1 or SD1) for shell
  */
   PREPARE_STREAM;
+  shell_reset_console();
 }
 
 #else
