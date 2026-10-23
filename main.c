@@ -983,10 +983,21 @@ VNA_SHELL_FUNCTION(cmd_remark)
 #ifdef __REMOTE_DESKTOP__
 uint8_t remote_mouse_down = false;
 uint8_t auto_capture = false;
+#ifdef __REFRESH_RLE__
+uint8_t remote_hold = false;
+static bool send_region_rle8(remote_region_t *rd, const pixel_t *px);
+#endif
 
 void send_region(remote_region_t *rd, uint8_t * buf, uint16_t size)
 {
+#ifdef __REFRESH_RLE__
+  if (remote_hold) return;
+#endif
   if (SDU1.config->usbp->state == USB_ACTIVE) {
+#ifdef __REFRESH_RLE__
+    if (auto_capture == 2 && rd->new_str[0] == 'b' && send_region_rle8(rd, (const pixel_t *)buf))
+      return;
+#endif
     streamWrite(shell_stream, (void*) rd, sizeof(remote_region_t));
     streamWrite(shell_stream, (void*) buf, size);
     streamWrite(shell_stream, (void*)"ch> ", 4);
@@ -998,7 +1009,11 @@ void send_region(remote_region_t *rd, uint8_t * buf, uint16_t size)
 VNA_SHELL_FUNCTION(cmd_refresh)
 {
 // read pixel count at one time (PART*2 bytes required for read buffer)
+#ifdef __REFRESH_RLE__
+  int m = generic_option_cmd("refresh", "off|on|rle", argc, argv[0]);
+#else
   int m = generic_option_cmd("refresh", "off|on", argc, argv[0]);
+#endif
   if (m>=0) {
     auto_capture = m;
   }
@@ -1160,6 +1175,47 @@ static bool capture_rle8(void)
   }
   return true;
 }
+
+#ifdef __REFRESH_RLE__
+/*
+ * "refresh rle": a bulk push of 256 pixels or more is sent RLE8 packed with its own palette:
+ *   "rle8\r\n", x, y, w, h, u16 palette size in bytes, palette, then the palette indices of all
+ *   w * h pixels as one PackBits stream without lengths (the receiver unpacks until it has w * h),
+ *   so runs of background continue over the rows. Smaller pushes fit the USB queue and stay "bulk",
+ *   as do regions with too many colours to get smaller.
+ */
+static uint16_t rle8_buf[32 + LCD_WIDTH / 2];          // packed part, its indices from byte 64
+static bool send_region_rle8(remote_region_t *rd, const pixel_t *px)
+{
+  int n = rd->w * rd->h, i = 0, k, m, x;
+  pixel_t c = ~px[0];
+  if (n < 256)
+    return false;
+  capture_colors = 0;
+  for (x = 0; x < n; x++)                              // the palette of the region
+    if (px[x] != c && !capture_palette_add(c = px[x]))
+      return false;
+  if (2 * capture_colors + n / 64 + 2 > n)             // packed it could be larger than raw
+    return false;
+  uint16_t size = capture_colors * sizeof(pixel_t);
+  memcpy(rd->new_str, "rle8\r\n", sizeof(rd->new_str));
+  streamWrite(shell_stream, (void *)rd, sizeof(remote_region_t));
+  streamWrite(shell_stream, (void *)&size, sizeof(size));
+  streamWrite(shell_stream, (void *)capture_palette, size);
+  uint8_t *index = (uint8_t *)&rle8_buf[32];
+  for (k = 0, c = ~px[0]; k < n; k += m) {             // LCD_WIDTH indices at a time, packed in place
+    m = n - k < LCD_WIDTH ? n - k : LCD_WIDTH;
+    for (x = 0; x < m; x++, px++) {
+      if (*px != c)
+        i = capture_palette_find(c = *px);
+      index[x] = i;
+    }
+    streamWrite(shell_stream, (void *)rle8_buf, packbits(index, (uint8_t *)rle8_buf, m));
+  }
+  streamWrite(shell_stream, (void *)"ch> ", 4);
+  return true;
+}
+#endif
 #endif
 
 VNA_SHELL_FUNCTION(cmd_capture)

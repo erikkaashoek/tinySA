@@ -1,4 +1,10 @@
-v1.4xxx 2026-09-30 For all tinySA models
+V1.4255 2026-10-23 For all tinySA Ultra models
+- "refresh rle" remote control: compressed screen updates and a scrolling waterfall, 8x to 16x less USB data (tinySA-App uses it automatically)
+
+V1.4245 2026-09-27 For all tinySA Ultra models
+- Added STORAGE/UPDATE FIRMWARE. This will let you select a new firmware in a .bin file and will update the tinySA
+
+V1.4252 2026-09-26 For all tinySA models
 - USB serial: fixed the PC waiting for more data after a reply that is a multiple of 64 bytes long
 - Fixed a race in the console command handling that could hang a command
 - Button auto repeat keeps working after the system timer wraps around (about every 5 days)
