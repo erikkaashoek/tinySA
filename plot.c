@@ -2205,7 +2205,12 @@ static void update_waterfall(void){
 //  START_PROFILE;
 #ifdef TINYSA4
 #define WATERFALL_MULTI (SPI_BUFFER_SIZE / WIDTH)
+#ifdef __REFRESH_RLE__
+  remote_hold = (auto_capture == 2);     // refresh rle: scroll as without remote, then push one "scrl"
+  if (!auto_capture || remote_hold) {
+#else
   if (!auto_capture) {
+#endif
     for (i = CHART_BOTTOM-WATERFALL_MULTI; i>=graph_bottom; i-=WATERFALL_MULTI) {		// Scroll down WATERFALL_MULTI lines at once
       ili9341_read_memory(OFFSETX, i, w_width, WATERFALL_MULTI, spi_buffer);
       ili9341_bulk(OFFSETX, i+1, w_width, WATERFALL_MULTI);
@@ -2217,6 +2222,14 @@ static void update_waterfall(void){
     ili9341_read_memory(OFFSETX, i, w_width, 1, spi_buffer);
     ili9341_bulk(OFFSETX, i+1, w_width, 1);
   }
+#ifdef __REFRESH_RLE__
+  if (remote_hold) {                     // rows graph_bottom .. CHART_BOTTOM-1 moved down by dy
+    remote_region_t rd = {"scrl\r\n", OFFSETX, graph_bottom, w_width, CHART_BOTTOM - graph_bottom};
+    int16_t dy = 1;
+    remote_hold = false;
+    send_region(&rd, (uint8_t *)&dy, sizeof(dy));
+  }
+#endif
   index_y_t *index = NULL;
   for (int t=0;t<TRACES_MAX;t++) {                      // Find trace with active measurement
     if (IS_TRACE_ENABLE(t) && setting.average[t] == AV_OFF) {

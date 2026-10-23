@@ -112,6 +112,7 @@
 #define __USE_USB_MSC__           // USB DISK mode: SD card as USB mass storage next to the USB serial port
 #define __SD_FIRMWARE_UPDATE__    // Install a firmware .bin from the SD card (fw_update.c)
 #define __CAPTURE_RLE8__          // capture with an argument sends the screen RLE8 compressed (NanoVNA-D format)
+#define __REFRESH_RLE__           // refresh rle: remote desktop pushes RLE8 compressed, the waterfall as a scroll
 #define __LCD_BRIGHTNESS__        // LCD or hardware allow change brightness, add menu item for this
 #define __HARMONIC__
 #define __NOISE_FIGURE__
@@ -298,7 +299,10 @@ const char *get_hw_version_text(void);
 
 #ifdef __REMOTE_DESKTOP__
 extern uint8_t remote_mouse_down;
-extern uint8_t auto_capture;
+extern uint8_t auto_capture;        // 0 = refresh off, 1 = refresh on, 2 = refresh rle
+#ifdef __REFRESH_RLE__
+extern uint8_t remote_hold;         // drop pushes, e.g. while the waterfall scrolls (pushed as one "scrl")
+#endif
 typedef struct {
   char new_str[6];
   int16_t x;
@@ -1802,6 +1806,9 @@ void clock_at_48MHz(void);
 #endif
 #if defined(__SD_FIRMWARE_UPDATE__) && (!defined(TINYSA4) || !defined(__USE_USB_MSC__) || !defined(__SD_FILE_BROWSER__))
 #error "__SD_FIRMWARE_UPDATE__ needs TINYSA4, __USE_USB_MSC__ and __SD_FILE_BROWSER__"
+#endif
+#if defined(__REFRESH_RLE__) && (!defined(__REMOTE_DESKTOP__) || !defined(__CAPTURE_RLE8__))
+#error "__REFRESH_RLE__ needs __REMOTE_DESKTOP__ and __CAPTURE_RLE8__"
 #endif
 #ifdef __SD_FIRMWARE_UPDATE__
 #include "fw_update.h"
