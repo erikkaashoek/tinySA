@@ -504,6 +504,12 @@ void lcd_setBrightness(uint16_t b){
 }
 #endif
 
+#ifdef __LCD_BRIGHTNESS__
+#define LCD_WAKE_UP_MS  120   // after sleep out the panel supplies settle, the backlight comes on after the init
+#else
+#define LCD_WAKE_UP_MS  2     // backlight not controlled: a longer wait only shows the uninitialised panel longer
+#endif
+
 void ili9341_init(void)
 {
   LCD_DC_DATA;
@@ -513,8 +519,8 @@ void ili9341_init(void)
   const uint8_t *p;
   for (p = LCD_INIT; *p; ) {
     send_command(p[0], p[1], &p[2]);
+    chThdSleepMilliseconds(p[0] == ILI9341_SLEEP_OUT ? LCD_WAKE_UP_MS : 2);
     p += 2 + p[1];
-    chThdSleepMilliseconds(2);
   }
 #ifdef TINYSA4
   if ((hwid % 100) >= 2) {

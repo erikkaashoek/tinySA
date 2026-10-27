@@ -3550,9 +3550,6 @@ int main(void)
   adc_init();
   PULSE
   DAC->CR|= DAC_CR_EN1 | DAC_CR_EN2; // Use DAC: CH1 and CH2
-  #ifdef  __LCD_BRIGHTNESS__
-    lcd_setBrightness(DEFAULT_BRIGHTNESS);
-  #endif
   DAC->DHR12R1 = 0;                  // Setup DAC: CH1 value
 
   /*
@@ -3563,6 +3560,11 @@ int main(void)
 #endif
   ili9341_init();
   PULSE
+  #ifdef  __LCD_BRIGHTNESS__
+    // Backlight on only now the screen is cleared: a panel in reset or before its init
+    // shows white (the ZS405 panel, ZS406/ZS407 stay black)
+    lcd_setBrightness(DEFAULT_BRIGHTNESS);
+  #endif
 
 #ifdef TINYSA4
   ili9341_set_foreground(LCD_FG_COLOR);
