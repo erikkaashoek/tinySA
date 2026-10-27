@@ -8106,6 +8106,7 @@ keypad_apply_touch(void)
 
 extern uint8_t in_menu_command;
 extern uint8_t remote_text;
+extern uint8_t keypad_open;
 
 static void
 ui_process_keypad(void)
@@ -8127,6 +8128,7 @@ ui_process_keypad(void)
     else
       draw_numeric_input(kp_buf);
   }
+  keypad_open = true;                         // shell commands for the sweep thread are refused now
   while (TRUE) {
     status = btn_check();
     if (status & (EVT_UP|EVT_DOWN)) {
@@ -8160,6 +8162,7 @@ ui_process_keypad(void)
       break;
     }
   }
+  keypad_open = false;
   kp_help_text = NULL;
   redraw_frame();
   if (current_menu_is_form()) {

@@ -962,6 +962,7 @@ VNA_SHELL_FUNCTION(cmd_menu)
 }
 
 uint8_t remote_text = false;
+uint8_t keypad_open = false;        // set by ui.c while the sweep thread waits for keypad input
 VNA_SHELL_FUNCTION(cmd_text)
 {
   if (argc!= 1)
@@ -3212,6 +3213,11 @@ static void VNAShell_executeLine(char *line)
       return;
     }
 #endif
+    // The sweep thread stays in an open keypad until it closes: answer at once instead of a 20 s timeout
+    if ((cmd_flag & CMD_WAIT_MUTEX) && keypad_open) {
+      shell_printf("keypad active" VNA_SHELL_NEWLINE_STR VNA_SHELL_PROMPT_STR);
+      return;
+    }
     if (cmd_flag & CMD_WAIT_MUTEX) {
       chSysLock();
       shell_function = scp->sc_function;
