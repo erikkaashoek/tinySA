@@ -1205,6 +1205,11 @@ const uint8_t right_icons [] =
 #define KP_500  40
 
 enum {NUM_KEYBOARD, TXT_KEYBOARD};
+#ifdef __USE_SD_CARD__
+#define IS_TXT_KEYBOARD (keypads[0].c == TXT_KEYBOARD)
+#else
+#define IS_TXT_KEYBOARD false           // keypads_text needs the SD card, the text keypad code is left out
+#endif
 
 typedef struct {
   uint16_t x_offs;
@@ -7138,15 +7143,47 @@ draw_numeric_input(const char *buf)
   }
 }
 
+#define TXT_INPUT_X     (14 + 10 * FONT_WIDTH)
+#define TXT_CURSOR_OUT  4           // the cursor sticks out above and below the letters, so it is no I
+
+static uint8_t kp_cursor;   // text keypad: characters are inserted and deleted here
+
+// Text with the cursor as a blue 2 pixel bar in its own gap (the glyphs are only 1 pixel apart)
 static void
 draw_text_input(const char *buf)
 {
   ili9341_set_foreground(LCD_INPUT_TEXT_COLOR);
   ili9341_set_background(LCD_INPUT_BG_COLOR);
-  uint16_t x = 14 + 10 * FONT_WIDTH;
+  int x = TXT_INPUT_X;
   uint16_t y = LCD_HEIGHT-(wFONT_GET_HEIGHT + NUM_INPUT_HEIGHT)/2;
-  ili9341_fill(x, y, wFONT_MAX_WIDTH * 20, wFONT_GET_HEIGHT);
-  ili9341_drawstring_10x14(buf, x, y);
+  ili9341_fill(x, y - TXT_CURSOR_OUT, LCD_WIDTH - x, wFONT_GET_HEIGHT + 2 * TXT_CURSOR_OUT);
+  char txt[2] = {0, 0};
+  for (int i = 0; ; i++) {
+    if (i == kp_cursor) {
+      ili9341_set_background(LCD_BRIGHT_COLOR_BLUE);
+      ili9341_fill(x, y - TXT_CURSOR_OUT, 2, wFONT_GET_HEIGHT + 2 * TXT_CURSOR_OUT);
+      ili9341_set_background(LCD_INPUT_BG_COLOR);
+      x += 3;
+    }
+    if ((txt[0] = buf[i]) == 0) break;
+    ili9341_drawstring_10x14(txt, x, y);
+    x += wFONT_GET_WIDTH(txt[0]);
+  }
+}
+
+// Touch on the text: the cursor goes to the character boundary nearest to touch_x
+static void
+text_cursor_touch(int touch_x)
+{
+  int x = TXT_INPUT_X, i;
+  for (i = 0; kp_buf[i]; i++) {
+    int w = wFONT_GET_WIDTH(kp_buf[i]);
+    if (touch_x < x + w / 2) break;
+    x += w;
+  }
+  if (i == kp_cursor) return;
+  kp_cursor = i;
+  draw_text_input(kp_buf);
 }
 
 static void
@@ -8005,15 +8042,21 @@ full_keypad_click(int c, int kp_index)
     set_numeric_value();            // Also for text values
     return KP_DONE;
   }
-  if (c == S_LARROW[0]) { // Backspace
+  if (kp_cursor > kp_index)         // kp_buf replaced by the text command
+    kp_cursor = kp_index;
+  if (c == S_LARROW[0]) { // Backspace: the character before the cursor
     if (kp_index == 0)
       return KP_CANCEL;
     if (keypad_long_press)          // long press erases the whole input, stay in the keypad
-      kp_index = 0;
-    else
-      --kp_index;
-  } else if (kp_index < TXTINPUT_LEN) { // any other text input
-    kp_buf[kp_index++] = c;
+      kp_index = kp_cursor = 0;
+    else if (kp_cursor > 0) {
+      memmove(&kp_buf[kp_cursor - 1], &kp_buf[kp_cursor], kp_index - kp_cursor);
+      kp_cursor--, kp_index--;
+    }
+  } else if (kp_index < TXTINPUT_LEN) { // any other text input, inserted at the cursor
+    memmove(&kp_buf[kp_cursor + 1], &kp_buf[kp_cursor], kp_index - kp_cursor);
+    kp_buf[kp_cursor++] = c;
+    kp_index++;
   }
   kp_buf[kp_index] = '\0';
   draw_text_input(kp_buf);
@@ -8024,7 +8067,7 @@ static int
 keypad_click(int key) {
   int c = keypads[key+1].c;  // !!! Use key + 1 (zero key index used or size define)
   int index = strlen(kp_buf);
-  int result = keypads[0].c == NUM_KEYBOARD ? num_keypad_click(c, index) : full_keypad_click(c, index);
+  int result = IS_TXT_KEYBOARD ? full_keypad_click(c, index) : num_keypad_click(c, index);
   return result;
 }
 
@@ -8033,6 +8076,13 @@ keypad_apply_touch(void)
 {
   int touch_x, touch_y;
   touch_position(&touch_x, &touch_y);
+  if (IS_TXT_KEYBOARD && touch_y >= LCD_HEIGHT - NUM_INPUT_HEIGHT) {
+    do {                            // touch on the text moves the cursor, follow the finger
+      touch_position(&touch_x, &touch_y);
+      text_cursor_touch(touch_x);
+    } while (touch_check() != EVT_TOUCH_RELEASED);
+    return -1;
+  }
   const keypad_pos_t *p = &key_pos[keypads[0].c];
   if (touch_x < p->x_offs || touch_y < p->y_offs) return -1;
   // Calculate key position from touch x and y
@@ -8069,12 +8119,13 @@ ui_process_keypad(void)
   keypad_long_press = false;
   if (!preset_text)
     kp_buf[0] = 0;
+  kp_cursor = strlen(kp_buf);
   if (in_menu_command) return;
   if (preset_text) {                          // show the default, ENTER accepts it as is
-    if (keypads[0].c == NUM_KEYBOARD)
-      draw_numeric_input(kp_buf);
-    else
+    if (IS_TXT_KEYBOARD)
       draw_text_input(kp_buf);
+    else
+      draw_numeric_input(kp_buf);
   }
   while (TRUE) {
     status = btn_check();
