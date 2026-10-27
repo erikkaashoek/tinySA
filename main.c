@@ -962,6 +962,7 @@ VNA_SHELL_FUNCTION(cmd_menu)
 }
 
 uint8_t remote_text = false;
+uint8_t keypad_open = false;        // set by ui.c while the sweep thread waits for keypad input
 VNA_SHELL_FUNCTION(cmd_text)
 {
   if (argc!= 1)
@@ -3212,6 +3213,11 @@ static void VNAShell_executeLine(char *line)
       return;
     }
 #endif
+    // The sweep thread stays in an open keypad until it closes: answer at once instead of a 20 s timeout
+    if ((cmd_flag & CMD_WAIT_MUTEX) && keypad_open) {
+      shell_printf("keypad active" VNA_SHELL_NEWLINE_STR VNA_SHELL_PROMPT_STR);
+      return;
+    }
     if (cmd_flag & CMD_WAIT_MUTEX) {
       chSysLock();
       shell_function = scp->sc_function;
@@ -3544,9 +3550,6 @@ int main(void)
   adc_init();
   PULSE
   DAC->CR|= DAC_CR_EN1 | DAC_CR_EN2; // Use DAC: CH1 and CH2
-  #ifdef  __LCD_BRIGHTNESS__
-    lcd_setBrightness(DEFAULT_BRIGHTNESS);
-  #endif
   DAC->DHR12R1 = 0;                  // Setup DAC: CH1 value
 
   /*
@@ -3557,6 +3560,11 @@ int main(void)
 #endif
   ili9341_init();
   PULSE
+  #ifdef  __LCD_BRIGHTNESS__
+    // Backlight on only now the screen is cleared: a panel in reset or before its init
+    // shows white (the ZS405 panel, ZS406/ZS407 stay black)
+    lcd_setBrightness(DEFAULT_BRIGHTNESS);
+  #endif
 
 #ifdef TINYSA4
   ili9341_set_foreground(LCD_FG_COLOR);
