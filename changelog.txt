@@ -1,3 +1,6 @@
+V1.4263 2026-10-28 For all tinySA Ultra models
+- PRESET > STORE > STORE 1-4 prefills the name keypad with the name of the active preset (the SD file it was loaded from, else the name it was stored under), so a single ENTER keeps it
+
 V1.4260 2026-10-27 For all tinySA models
 - File, band and preset names can be edited anywhere: touch the name to place the cursor, keys insert and backspace deletes at the cursor (Ultra only)
 - While a keypad is open, console commands that cannot run (e.g. vbat, sweep) are answered "keypad active" at once instead of after 20 s, so remote editing with tinySA-App no longer slows down
