@@ -109,7 +109,7 @@ static bool keypad_text_preset = false;
 // Set while handling a keypad key that was held down longer than a short tap
 static bool keypad_long_press = false;
 
-#ifdef __SD_FILE_BROWSER__
+#if defined(__SD_FILE_BROWSER__) || defined(TINYSA4)
 // Preset the keypad input with the first len characters of text
 static void ui_preset_keypad_text(const char *text, int len)
 {
@@ -2250,6 +2250,23 @@ static UI_FUNCTION_ADV_CALLBACK(menu_store_preset_acb)
   }
 #ifdef TINYSA4
   else {
+    // Offer the name of the active preset, so a single ENTER keeps it: the SD file
+    // it was loaded from, else the name it was stored under
+    const char *name = setting.preset_name;
+    int len = strlen(name);
+#ifdef __SD_FILE_BROWSER__
+    if (sd_preset_path[0]) {
+      name = sd_preset_path;
+      len = strlen(name);
+      int ext = sizeof(".prs") - 1;
+      if (len > ext && name[len - ext] == '.')
+        len -= ext;
+    }
+#endif
+    if (len > PRESET_NAME_LENGTH - 1)             // show only what the slot can hold
+      len = PRESET_NAME_LENGTH - 1;
+    if (len > 0)
+      ui_preset_keypad_text(name, len);
     kp_help_text = "Preset name";
     ui_mode_keypad(KM_PRESET_NAME);
   }
