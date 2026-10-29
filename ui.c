@@ -8687,14 +8687,20 @@ ui_process(void)
     selection = -1; // hide keyboard mode selection
     ui_mode_menu();
   }
+  // Clear only the handled request: the shell may have set OP_CONSOLE meanwhile for a
+  // waiting command, without it an output mode sweep never stops to run that command
   if ((operation_requested&OP_LEVER) || previous_button_state != button_state) {
     ui_process_lever();
     previous_button_state = button_state;
-    operation_requested = OP_NONE;
+    chSysLock();
+    operation_requested &= ~OP_LEVER;
+    chSysUnlock();
   }
   if (operation_requested&OP_TOUCH) {
     ui_process_touch();
-    operation_requested = OP_NONE;
+    chSysLock();
+    operation_requested &= ~OP_TOUCH;
+    chSysUnlock();
   }
   touch_start_watchdog();
 }

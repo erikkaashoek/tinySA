@@ -755,7 +755,9 @@ void SI4432_Listen(int s)
   uint16_t sel = SI_nSEL[SI4432_Sel];
   uint8_t max = 0;
   uint16_t count = 0;
-  operation_requested = OP_NONE;
+  chSysLock();
+  operation_requested &= ~(OP_LEVER|OP_TOUCH);  // keep a console request, its command is waiting
+  chSysUnlock();
   do {
       uint8_t v;
       palClearPad(GPIOC, sel);

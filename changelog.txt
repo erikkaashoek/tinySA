@@ -1,3 +1,6 @@
+V1.4266 2026-10-29 For all tinySA models
+- Fixed a console command sent right after "output", "modulation" or a touch (e.g. by a script) hanging in output mode until "Command timeout" after 20 s
+
 V1.4263 2026-10-28 For all tinySA Ultra models
 - PRESET > STORE > STORE 1-4 prefills the name keypad with the name of the active preset (the SD file it was loaded from, else the name it was stored under), so a single ENTER keeps it
 

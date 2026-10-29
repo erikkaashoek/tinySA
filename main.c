@@ -268,6 +268,9 @@ static THD_FUNCTION(Thread1, arg)
     chSysLock();
     local_func = shell_function;
     shell_function = 0;
+    // The shell sets OP_CONSOLE together with shell_function, a request without a
+    // command (direct command, timed out command) has done its job: the sweep stopped
+    operation_requested &= ~OP_CONSOLE;
     chSysUnlock();
 
     if (local_func) {
@@ -3255,7 +3258,9 @@ static void VNAShell_executeLine(char *line)
 #else
       if (dirty) {
 #endif
-        operation_requested = true;   // ensure output is updated
+        chSysLock();
+        operation_requested |= OP_CONSOLE;  // ensure output is updated: stop the sweep, not a lever event
+        chSysUnlock();
         if (MODE_OUTPUT(setting.mode))
           draw_menu();    // update screen if in output mode and dirty
         else
