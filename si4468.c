@@ -2132,7 +2132,9 @@ void SI4432_Listen(int s)
   (void) s;
   uint8_t max = 0;
   uint16_t count = 0;
-  operation_requested = OP_NONE;
+  chSysLock();
+  operation_requested &= ~(OP_LEVER|OP_TOUCH);  // keep a console request, its command is waiting
+  chSysUnlock();
 //  SI4463_WAIT_CTS;                // Wait for CTS
   do {
       uint8_t v = Si446x_readRSSI();
