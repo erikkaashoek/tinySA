@@ -1,3 +1,8 @@
+V1.4270 2026-11-01 For all tinySA models
+- Trigger lines can be dragged with the touch screen, in multi band mode the trigger line of each band (multi band Ultra only)
+- The trigger LEVEL button shows the level in the selected unit instead of the dBm value
+- Fixed the trigger lines in multi band mode when the bands use different point counts (Ultra only)
+
 V1.4266 2026-10-29 For all tinySA models
 - Fixed a console command sent right after "output", "modulation" or a touch (e.g. by a script) hanging in output mode until "Command timeout" after 20 s
 
