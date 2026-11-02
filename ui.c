@@ -8449,8 +8449,7 @@ static void sa_save_file(uint8_t format) {
             char *buf = (char *)spi_buffer;
             buf += plot_printf(buf, 100, "%U, ", setting.bands[i].start);
             buf += plot_printf(buf, 100, "%U, ", setting.bands[i].end);
-            buf += plot_printf(buf, 100, "%f ", setting.bands[i].level);
-            buf += plot_printf(buf, 100, "\r\n");
+            buf += plot_printf(buf, 100, "%f, \"%s\"\r\n", setting.bands[i].level, setting.bands[i].name);  // name: older firmware ignores it
             res = f_write(fs_file, (char *)spi_buffer, buf - (char *)spi_buffer, &size);
           }
         }

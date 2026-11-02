@@ -177,11 +177,13 @@ finish2:
           line[j] = 0; j = 0;
           char *args[16];
           int nargs = parse_line(line, args, 16);                            // Parse line to 16 args
-          if (nargs < 2 || args[0][0] == '#' || args[0][0] == '!') continue; // No data or comment or settings
+          if (nargs < 3 || args[0][0] == '#' || args[0][0] == '!') continue; // No data or comment or settings
           if (count >= BANDS_MAX) {error = "Format err"; goto finish3;}
           setting.bands[count].start = my_atoui(args[0]);// Get frequency
           setting.bands[count].end = my_atoui(args[1]);// Get frequency
           setting.bands[count].level = my_atof(args[2]);     // Get frequency
+          if (nargs > 3)                                     // Name, files of older firmware have none
+            plot_printf(setting.bands[count].name, BAND_NAME_SIZE, "%s", args[3]);
           setting.bands[count].enabled = true;               // Get frequency
           count++;
         }
