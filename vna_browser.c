@@ -334,6 +334,7 @@ static char cmd_buffer[256+128];
       set_scale(setting.scale);
       set_reflevel(setting.reflevel);
       set_level_meter_or_waterfall();
+      update_rbw();                     // as caldata_recall(), else the RBW of the loaded preset is not used
       // Remember where this preset came from so storing it back can default to it
       plot_printf(sd_preset_path, sizeof(sd_preset_path), "%s", fno.fname);
     }
