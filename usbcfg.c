@@ -248,74 +248,28 @@ static const uint8_t vcom_string2[] = {
 };
 #endif
 
-#ifdef TINYSA4
 /*
- * Serial Number string. VERSION = 'tinySA4_v1.3-nnn-gxxxxxxx'
- *                                  01234567890123456789012
- * skip last two 'xx' char due to  'tinySA4_v1.3-n-gxxxxxxx'
+ * Serial Number string: 12 hex digits made from the MCU unique ID the way the STM32F303 DFU
+ * bootloader makes its serial number (UID0 + UID2, then the upper half of UID2), so every tinySA
+ * has its own. It was the kernel version "400" on all of them: Windows could not tell two units
+ * apart and gave one unit's COM port to the other. Filled at every USB reset, before it is requested.
  */
-static const uint8_t vcom_string3[] =
+static uint8_t vcom_string3[2 + 2 * 12];       // the upper bytes of the UTF-16 characters stay 0
+
+static void fill_serial_string(void)
 {
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
- USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
-  USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[8], 0,  /* 'v' */
-  VERSION[9], 0,  /* '1' */
-  VERSION[10], 0, /* '.' */
-  VERSION[11], 0, /* '3' */
-  VERSION[12], 0, /* '-' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* 'n' */
-  VERSION[16], 0, /* '-' */
-  VERSION[17], 0, /* 'g' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-  VERSION[22], 0, /* 'x' */
-#endif
-};
-#else
-/*
- * Serial Number string. VERSION = 'tinySA_v1.3-nnn-gxxxxxxx'
- *                                  0123456789012345678901
- * skip last two 'xx' char due to  'tinySA_v1.3-n-gxxxxxxx'
- */
-static const uint8_t vcom_string3[] = {
-#if 1
- USB_DESC_BYTE(8),                    /* bLength.                         */
- USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
- '0' + CH_KERNEL_MAJOR, 0,
- '0' + CH_KERNEL_MINOR, 0,
- '0' + CH_KERNEL_PATCH, 0
-#else
- USB_DESC_BYTE(32),                    /* bLength.                         */
-  USB_DESC_BYTE(USB_DESCRIPTOR_STRING), /* bDescriptorType.                 */
-  VERSION[7], 0,  /* 'v' */
-  VERSION[8], 0,  /* '1' */
-  VERSION[9], 0,  /* '.' */
-  VERSION[10], 0, /* '3' */
-  VERSION[11], 0, /* '-' */
-  VERSION[12], 0, /* 'n' */
-  VERSION[13], 0, /* 'n' */
-  VERSION[14], 0, /* 'n' */
-  VERSION[15], 0, /* '-' */
-  VERSION[16], 0, /* 'g' */
-  VERSION[17], 0, /* 'x' */
-  VERSION[18], 0, /* 'x' */
-  VERSION[19], 0, /* 'x' */
-  VERSION[20], 0, /* 'x' */
-  VERSION[21], 0, /* 'x' */
-#endif
-};
-#endif
+  const uint32_t *uid = (const uint32_t *)UID_BASE;
+  uint32_t v = uid[0] + uid[2];
+  vcom_string3[0] = sizeof vcom_string3;
+  vcom_string3[1] = USB_DESCRIPTOR_STRING;
+  for (int i = 2; i < (int)sizeof vcom_string3; i += 2) {
+    if (i == 2 + 2 * 8)                        // 8 digits done: then the upper half of UID2
+      v = uid[2];
+    uint8_t c = v >> 28;
+    v <<= 4;
+    vcom_string3[i] = c + (c < 10 ? '0' : 'A' - 10);
+  }
+}
 
 /*
  * Strings wrappers array.
@@ -406,6 +360,7 @@ static void usb_event(USBDriver *usbp, usbevent_t event) {
 
   switch (event) {
   case USB_EVENT_RESET:
+    fill_serial_string();
 #ifdef __USE_USB_MSC__
     {
       /* usb_lld_reset() has just allocated the EP0 buffers.*/
