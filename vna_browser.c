@@ -221,6 +221,8 @@ finish3:
           char *args[16];
           int nargs = parse_line(line, args, 16);                            // Parse line to 16 args
           if (nargs < 2 || args[0][0] == '#' || args[0][0] == '!') continue; // No data or comment or settings
+          if (strchr(args[0], '.'))                                          // MHz (CONFIG MHz CSV), Hz has no decimals
+            args[0][strlen(args[0])] = 'M';                                  // suffix so my_atoui returns Hz
           f = my_atoui(args[0]);                                             // Get frequency
           if (count >= POINTS_COUNT || f > maxFreq) {error = "Format err"; goto finish;}
           if (count == 0)  {
@@ -331,6 +333,8 @@ static char cmd_buffer[256+128];
         magic == SETTING_MAGIC && f_read(fs_file, src, total, &size) == FR_OK) {
 
      // TODO remove code duplication with flash.c
+      memset(setting.normalized, 0, sizeof setting.normalized);     // the normalize reference trace is not in a preset
+      setting.normalized_trace = -1;
       update_min_max_freq();
       update_frequencies();
       set_scale(setting.scale);

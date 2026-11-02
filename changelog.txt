@@ -1,3 +1,10 @@
+V1.4290 2026-11-02 For all tinySA models
+- Recalling a preset turns NORMALIZE off: the normalization reference trace is not stored in a preset, so the normalized trace was wrong
+- Trace CSV files load with their own start and stop frequency again: with CONFIG > MHz CSV (the default) the frequencies were read as Hz (Ultra only)
+- AM output keeps enough attenuator range for the modulation at every level: just above the level where the output switch is used the troughs were cut off without a warning, at some lower levels the peaks (DEPTH ERROR) (Ultra only)
+- FM modulation uses more steps: any number up to 12000 per second instead of powers of 2, e.g. 12 steps at 1 kHz (was 4) and 6 steps at 2 kHz (was a square wave) (Ultra only)
+- Fixed the "CTCSS + 1 kHz" tone being switched on after an update from a version older than V1.4220 (Ultra only)
+
 V1.4284 2026-11-02 For all tinySA models
 - Every tinySA has its own USB serial number (from the MCU unique ID, on the tinySA Ultra the same as its DFU serial number), so Windows can tell several tinySAs apart. Windows assigns a new COM port once
 - The battery stays visible when the sweep is paused with the "pause" console command

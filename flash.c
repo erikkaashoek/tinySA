@@ -127,6 +127,10 @@ config_recall(void)
   if (config.sd_icon_save == 0)
     config.sd_icon_save = SDIS_DEFAULT;
 #endif // __USE_SD_CARD__
+#ifdef TINYSA4
+  if (config.wfm_1khz_harmonic > 100)   // v1.4-220 placed it on the old sd_icon_save byte (always >= 0x80)
+    config.wfm_1khz_harmonic = 0;
+#endif
 
   return 0;
 }
@@ -233,6 +237,8 @@ caldata_recall(uint16_t id)
 
   /* duplicated saved data onto sram to be able to modify marker/trace */
   memcpy(dst, src, sizeof(setting_t));
+  memset(setting.normalized, 0, sizeof setting.normalized);     // the normalize reference trace is not in a preset
+  setting.normalized_trace = -1;
 #ifdef __SD_FILE_BROWSER__
   sd_preset_path[0] = 0;              // this preset came from flash, not from SD
 #endif
