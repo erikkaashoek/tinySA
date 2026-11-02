@@ -3502,6 +3502,21 @@ static int modulation_steps = 8;
 
 // Max = 10000 / 28.8
 static const int sine_wave[MAX_MODULATION_STEPS/4+1] = {0,    17,     34,     51,     68,     84,     101,    117,    133,    148,    164,    179,    193,    207,    220,    233,    246,    257,    268,    279,    289,    298,    306,    314,    321,    327,    332,    337,    341,    343,    346,    347,    347 };
+
+// sine_wave[] (+-347) at phase p in 1/(MAX_MODULATION_STEPS*256) of a period, linear interpolation
+static int sine347(uint32_t p)
+{
+  p &= MAX_MODULATION_STEPS*256 - 1;
+  int neg = p >= MAX_MODULATION_STEPS/2*256;
+  if (neg) p -= MAX_MODULATION_STEPS/2*256;
+  if (p > MAX_MODULATION_STEPS/4*256) p = MAX_MODULATION_STEPS/2*256 - p;
+  int i = p >> 8;
+  int v = sine_wave[i];
+  if (i < MAX_MODULATION_STEPS/4)
+    v += ((sine_wave[i+1] - v) * (int)(p & 255)) >> 8;
+  return neg ? -v : v;
+}
+#define MAX_FM_STEP_RATE    12000   // Si4468 offset updates per second for FM, faster makes the output crackle
 //
 //  Offset is 14.4Hz when below 600MHz and 28.8 when above.
 //
@@ -3748,43 +3763,20 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
         }
       }
       if (setting.modulation == MO_WFM) {
-        int sine_wave_index = 1;
         config.cor_am = INITIAL_MODULATION_CORRECTION;        // Initialize with some spare
-        modulation_steps = MAX_MODULATION_STEPS; // Search modulation steps that fit frequency
-        //modulation_steps = 8;  // <-----------------TEMP!!!!!
-        while ( ((modulation_delay = ((float)8000000/ modulation_steps ) / setting.modulation_frequency + config.cor_am)) < 900 && modulation_steps >= 4) {
-          sine_wave_index <<= 1;
-          modulation_steps >>= 1;
-        }
-        if (modulation_steps >= 4) {
-          int hn = (config.wfm_1khz_harmonic > 0 && setting.modulation_frequency < MAX_CTCSS_FREQ) ? (int)((1000.0 / setting.modulation_frequency) + 0.5) : 0;
-          int local_deviation = setting.modulation_deviation_div100;
+        modulation_steps = MAX_FM_STEP_RATE / setting.modulation_frequency;   // any count, not only powers of 2
+        if (modulation_steps > MAX_MODULATION_STEPS) modulation_steps = MAX_MODULATION_STEPS;
+        if (modulation_steps < 2) modulation_steps = 2;
+        int hn = (config.wfm_1khz_harmonic > 0 && setting.modulation_frequency < MAX_CTCSS_FREQ) ? (int)((1000.0 / setting.modulation_frequency) + 0.5) : 0;
+        int local_deviation = setting.modulation_deviation_div100;
+        if (hn)
+          local_deviation /= 7;                   // 15% CTCSS deviation
+        for (int i = 0; i < modulation_steps; i++) {
+          uint32_t p = (2*i+1) * (MAX_MODULATION_STEPS*256/2) / modulation_steps;    // middle of the step: 2 steps give +-deviation
+          int v = local_deviation * sine347(p) / 100;
           if (hn)
-            local_deviation /= 7;                   // 15% CTCSS deviation
-          for (int i = 0; i < modulation_steps/4+1; i++) {
-            fm_modulation[i] = local_deviation * sine_wave[i*sine_wave_index]/100;
-            fm_modulation[modulation_steps/2 - i] = fm_modulation[i];
-            fm_modulation[modulation_steps/2 + i] = -fm_modulation[i];
-            fm_modulation[modulation_steps - i] = -fm_modulation[i];
-          }
-          if (hn) {
-            for (int i = 0; i < modulation_steps; i++) {
-              int table_index = (i*sine_wave_index*hn) % MAX_MODULATION_STEPS;
-              int mul = 1;
-              if (table_index > MAX_MODULATION_STEPS/2) {
-                mul = -1;
-                table_index = MAX_MODULATION_STEPS - table_index;
-              }
-              if (table_index > MAX_MODULATION_STEPS/4)
-                table_index = MAX_MODULATION_STEPS/2 - table_index;
-              int v = setting.modulation_deviation_div100 * sine_wave[table_index] * mul / 100;
-              fm_modulation[i] += v;
-            }
-          }
-        } else {
-          modulation_steps = 2;
-          fm_modulation[0] = (setting.modulation_deviation_div100*347)/100;
-          fm_modulation[1] = -fm_modulation[0];
+            v += setting.modulation_deviation_div100 * sine347(p * hn) / 100;   // approximate 1 kHz tone
+          fm_modulation[i] = v;
         }
       }
 #else
