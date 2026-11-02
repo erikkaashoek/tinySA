@@ -6495,6 +6495,7 @@ redraw_cal_status:
 #endif
     return;
   }
+  redraw_request |= REDRAW_BATTERY;    // the fill erased it, while paused no completed sweep redraws it
 
     //  if (current_menu_is_form() && !in_selftest)
 //    return;
