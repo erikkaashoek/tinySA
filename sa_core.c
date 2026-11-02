@@ -277,7 +277,9 @@ void set_output_path(freq_t f, float level)
     switch_atten = 31.0;
 #endif
   float a = level - level_max();                 // convert to all settings maximum power output equals a = zero
-  if (a < -switch_atten + BELOW_MAX_DRIVE(0)) {           // Switch needed
+  // Switch needed. AM: switch as soon as possible, else just above the threshold the attenuator is near
+  // its maximum and has no room left for the modulation troughs
+  if (a < -switch_atten + (setting.modulation == MO_AM ? 0 : BELOW_MAX_DRIVE(0))) {
     a = a + switch_atten;
     setting.atten_step = true;
   } else
@@ -308,7 +310,8 @@ void set_output_path(freq_t f, float level)
   int ar = 31 - ATTENUATION_RESERVE;
   if (setting.modulation == MO_AM) // reserve attenuator range for AM modulation
     ar = 6;
-  while (a + ar < blw && d > LOWEST_LEVEL) { // reduce till it fits attenuator ((ar+ATTENUATION_RESERVE) ..  ATTENUATION_RESERVE)
+  while (a + ar < blw && d > LOWEST_LEVEL   // reduce till it fits attenuator ((ar+ATTENUATION_RESERVE) ..  ATTENUATION_RESERVE)
+         && (setting.modulation != MO_AM || BELOW_MAX_DRIVE(d-1) >= a)) { // AM: a drive step larger than ar must not use the reserve for the peaks
     d--;
     blw =  BELOW_MAX_DRIVE(d);
   }
