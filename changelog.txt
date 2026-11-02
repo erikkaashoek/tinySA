@@ -1,3 +1,6 @@
+V1.4273 2026-11-02 For all tinySA Ultra models
+- The tinySA Ultra has its own USB IDs: VID 0x1781 PID 0x0A44 (was 0x0483 0x5740, the ST virtual COM port). Windows assigns a new COM port once, programs that look for the tinySA by its USB IDs need an update (tinySA-App accepts both)
+
 V1.4270 2026-11-01 For all tinySA models
 - Trigger lines can be dragged with the touch screen, in multi band mode the trigger line of each band (multi band Ultra only)
 - The trigger LEVEL button shows the level in the selected unit instead of the dBm value
