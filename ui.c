@@ -707,10 +707,12 @@ extern const char *states[];
 #else
     uint32_t stklimit = 0U;
 #endif
-    lcd_printf(x, y+=bFONT_STR_HEIGHT, "%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s",
+    // The font is proportional (a space is narrower than a digit), padding with spaces does not align:
+    // zero padded numbers, the name after them, the state at a fixed position
+    lcd_printf(x, y+=bFONT_STR_HEIGHT, "%08x|%08x|%08x|%08x|%u|%03u|%s",
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
-             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
-             tp->name == NULL ? "" : tp->name);
+             (uint32_t)tp->refs - 1, (uint32_t)tp->prio, tp->name == NULL ? "" : tp->name);
+    lcd_printf(x + 330, y, "%s", states[tp->state]);
     tp = chRegNextThread(tp);
   } while (tp != NULL);
 #endif
@@ -6495,6 +6497,7 @@ redraw_cal_status:
 #endif
     return;
   }
+  redraw_request |= REDRAW_BATTERY;    // the fill erased it, while paused no completed sweep redraws it
 
     //  if (current_menu_is_form() && !in_selftest)
 //    return;
@@ -8448,8 +8451,7 @@ static void sa_save_file(uint8_t format) {
             char *buf = (char *)spi_buffer;
             buf += plot_printf(buf, 100, "%U, ", setting.bands[i].start);
             buf += plot_printf(buf, 100, "%U, ", setting.bands[i].end);
-            buf += plot_printf(buf, 100, "%f ", setting.bands[i].level);
-            buf += plot_printf(buf, 100, "\r\n");
+            buf += plot_printf(buf, 100, "%f, \"%s\"\r\n", setting.bands[i].level, setting.bands[i].name);  // name: older firmware ignores it
             res = f_write(fs_file, (char *)spi_buffer, buf - (char *)spi_buffer, &size);
           }
         }

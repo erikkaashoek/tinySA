@@ -1,3 +1,12 @@
+V1.4284 2026-11-02 For all tinySA models
+- Every tinySA has its own USB serial number (from the MCU unique ID, on the tinySA Ultra the same as its DFU serial number), so Windows can tell several tinySAs apart. Windows assigns a new COM port once
+- The battery stays visible when the sweep is paused with the "pause" console command
+- "ext_gain" without a value shows the current external gain
+- A preset loaded from SD now also uses its RBW (Ultra only)
+- Band names are stored in .bnd files and loaded from them (Ultra only)
+- Self test: when there is no signal, "Cable connected?" is shown in the test list instead of a hint that was overwritten
+- Version screen: copyright 2026, aligned thread table (Ultra only)
+
 V1.4273 2026-11-02 For all tinySA Ultra models
 - The tinySA Ultra has its own USB IDs: VID 0x1781 PID 0x0A44 (was 0x0483 0x5740, the ST virtual COM port). Windows assigns a new COM port once, programs that look for the tinySA by its USB IDs need an update (tinySA-App accepts both)
 

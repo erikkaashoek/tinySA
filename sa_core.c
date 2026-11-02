@@ -6476,6 +6476,7 @@ static const  char *const test_text [4] =
 static const  char *(test_fail_cause [TEST_COUNT]);
 static int test_status[TEST_COUNT];
 static int show_test_info = FALSE;
+static const char *test_hint;             // last line of the test list while waiting for a touch
 static volatile int test_wait = false;
 static float test_value;
 
@@ -6584,7 +6585,7 @@ void cell_draw_test_info(int x0, int y0)
       cell_printf(xpos, ypos, FONT_s"Self test status:");
     } else if (test_case[i].kind == TC_END) {
       if (test_wait)
-        cell_printf(xpos, ypos, FONT_s"Touch screen to continue");
+        cell_printf(xpos, ypos, FONT_s"%s", test_hint);
       continue;
     } else {
       cell_printf(xpos, ypos, FONT_s"Test %d: %s%s", i+1, test_fail_cause[i], test_text[test_status[i]] );
@@ -7153,6 +7154,7 @@ void selftest(int test)
       test_fail_cause[i] = "";
     }
     show_test_info = TRUE;
+    test_hint = "Touch screen to continue";
     test_step=0;
     test_step = setting.test_argument;
     if (test_step != 0) {
@@ -7170,9 +7172,7 @@ void selftest(int test)
       if (test_step == 2) {
         if (peakLevel < -60) {
           test_step = TEST_END;
-          ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
-          ili9341_drawstring_7x13("Signal level too low", 30, 140);
-          ili9341_drawstring_7x13("Did you connect high and low ports with cable?", 0, 210);
+          test_hint = "Cable connected? Touch screen to continue";   // drawn in the list, a direct draw was overwritten
           goto resume2;
         }
 

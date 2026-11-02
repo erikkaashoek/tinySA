@@ -398,7 +398,7 @@ VNA_SHELL_FUNCTION(cmd_sweeptime)
 VNA_SHELL_FUNCTION(cmd_ext_gain)
 {
   if (argc != 1 || argv[0][0] == '?') {
-    usage_printf("ext_gain -100.0..+100.0\r\n");
+    usage_printf("ext_gain -100.0..+100.0\r\n%.1f\r\n", setting.external_gain);
     return;
   }
   float o = my_atof(argv[0]);
