@@ -31,6 +31,18 @@ SerialUSBDriver SDU1;
 #define USBD1_INTERRUPT_REQUEST_EP      2
 
 /*
+ * USB vendor and product ID: the tinySA ULTRA has its own, the tinySA keeps
+ * the ST virtual COM port pair.
+ */
+#ifdef TINYSA4
+#define USB_VID                         0x1781
+#define USB_PID                         0x0A44
+#else
+#define USB_VID                         0x0483  /* ST */
+#define USB_PID                         0x5740
+#endif
+
+/*
  * USB Device Descriptor.
  */
 static const uint8_t vcom_device_descriptor_data[18] = {
@@ -41,8 +53,8 @@ static const uint8_t vcom_device_descriptor_data[18] = {
                          0x02,          /* bDeviceSubClass (Common Class).  */
                          0x01,          /* bDeviceProtocol (IAD).           */
                          0x40,          /* bMaxPacketSize.                  */
-                         0x0483,        /* idVendor (ST).                   */
-                         0x5740,        /* idProduct.                       */
+                         USB_VID,       /* idVendor.                        */
+                         USB_PID,       /* idProduct.                       */
                          0x0201,        /* bcdDevice, changed with the
                                            composite layout so that Windows
                                            selects the drivers again.       */
@@ -56,8 +68,8 @@ static const uint8_t vcom_device_descriptor_data[18] = {
                          0x00,          /* bDeviceSubClass.                 */
                          0x00,          /* bDeviceProtocol.                 */
                          0x40,          /* bMaxPacketSize.                  */
-                         0x0483,        /* idVendor (ST).                   */
-                         0x5740,        /* idProduct.                       */
+                         USB_VID,       /* idVendor.                        */
+                         USB_PID,       /* idProduct.                       */
                          0x0200,        /* bcdDevice.                       */
                          1,             /* iManufacturer.                   */
                          2,             /* iProduct.                        */
