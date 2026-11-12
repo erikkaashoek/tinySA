@@ -1390,9 +1390,17 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
   freq_t old_step = setting.frequency_step;
   float f_step = (stop-start)/ points;
   setting.frequency_step = (freq_t)f_step;
+  // perform() recalculates for a new frequency step itself. Zero span measures a series of RSSI
+  // samples at one frequency, which needs a full setup, also for the sweep after it.
+  bool zero_span = setting.frequency_step == 0;
+  if (zero_span && points == 1) {   // one point as in a sweep: one measurement, auto RBW as in zero span
+    setting.frequency_step = setting.rbw_x10 ? setting.rbw_x10*50 : 300000;
+    zero_span = false;
+  }
 again:
   operation_requested = false;
-  dirty = true;
+  if (zero_span)
+    dirty = true;
 //  adc_stop_analog_watchdog();
   int oldpos = 0;
   if (!UI_OFF) {                                // ui off: no progress bar
@@ -1431,7 +1439,8 @@ again:
     ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
   }
   setting.frequency_step = old_step;
-  dirty = true;
+  if (zero_span)
+    dirty = true;
   redraw_request = 0; // disable screen update in this mode
 }
 

@@ -3715,6 +3715,7 @@ bool depth_error = false;
 
 #endif
 
+static freq_t setup_frequency_step;     // frequency step the first point of perform() was set up for
 
 pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     // Measure the RSSI for one frequency, used from sweep and other measurement routines. Must do all HW setup
 {
@@ -3735,7 +3736,11 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
   }
 #endif
   TRACE(10);
-  if (i == 0 && dirty ) {                                                        // if first point in scan and dirty
+  // First point after a change of settings (dirty) or of the frequency step (scanraw, the sweep
+  // after it): only dirty sets up the hardware, which takes about 80 ms on the tinySA basic
+  if (i == 0 && (dirty || setting.frequency_step != setup_frequency_step)) {
+    const bool hw = dirty;
+    if (hw) {
 #ifdef __ADF4351__
     clear_frequency_cache();
 #endif
@@ -3749,15 +3754,17 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       PE4302_Write_Byte((int)(setting.attenuate_x2));
 #endif
     set_calibration_freq(setting.refer);
-    update_rbw();
-    calculate_step_delay();
     prev_output_level_dBm = MIN_RSSI_VALUE;                     // clear cached level setting
-    // Initialize HW
-    scandirty = true;                                                       // This is the first pass with new settings
     for (int t=0;t<TRACES_MAX;t++)
       setting.scan_after_dirty[t] = 0;
     dirty = false;
     sweep_elapsed = chVTGetSystemTimeX();                              // for measuring accumulated time
+    }
+    // The RBW (auto RBW, sub-steps), the step delay and the RSSI correction of the RBW depend on the step
+    setup_frequency_step = setting.frequency_step;
+    update_rbw();
+    calculate_step_delay();
+    scandirty = true;                                                       // This is the first pass with new settings
     // Set for actual time pre calculated value (update after sweep)
     setting.actual_sweep_time_us = calc_min_sweep_time_us();
     // Change actual sweep time as user input if it greater minimum
@@ -3782,15 +3789,17 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     if (MODE_INPUT(setting.mode)) {
       calculate_static_correction();
 #ifdef __MCU_CLOCK_SHIFT__
-      if (!in_selftest) clock_above_48MHz();
-      is_below = false;
+      if (hw) {
+        if (!in_selftest) clock_above_48MHz();
+        is_below = false;
+      }
 #endif
       correct_RSSI_freq = get_frequency_correction(f);  // for i == 0 and freq_step == 0;
 #ifdef TINYSA4
 //      correct_RSSI_freq += float_TO_PURE_RSSI(direct ? +6.0 : 0); // TODO add impact of direct
 #endif
 
-    } else {
+    } else if (hw) {
 #ifdef __MCU_CLOCK_SHIFT__
       clock_at_48MHz();
 #endif
@@ -3847,7 +3856,7 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     //    if (MODE_OUTPUT(setting.mode) && setting.additional_step_delay_us < 500)     // Minimum wait time to prevent LO from lockup during output frequency sweep
     //      setting.additional_step_delay_us = 500;
     // Update grid and status after
-    if (break_on_operation  && MODE_INPUT(setting.mode)) {                       // during normal operation
+    if (hw && break_on_operation  && MODE_INPUT(setting.mode)) {                       // during normal operation
       redraw_request |= REDRAW_CAL_STATUS;
       if (FREQ_IS_CW()) {                                       // if zero span mode
         update_grid();                                          // and update grid and frequency
