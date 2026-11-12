@@ -337,7 +337,9 @@ static THD_FUNCTION(Thread1, arg)
     }
 #endif
 #ifdef __UI_OFF__
-    if (ui_off && !shell_check_connect()) { // an unplugged tinySA must not stay blind
+    // An unplugged tinySA must not stay blind. The USB suspend also stops the endless sweep of
+    // an output mode (usbcfg.c), else this would only run after the next touch or command.
+    if (ui_off && !shell_check_connect()) {
       set_ui(true);
       ui_on_notice = false;                 // no PC to tell
     }

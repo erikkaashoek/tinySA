@@ -422,6 +422,12 @@ static void usb_event(USBDriver *usbp, usbevent_t event) {
 
     /* Disconnection event on suspend.*/
     sduDisconnectI(&SDU1);
+#ifdef __UI_OFF__
+    /* ui off: the sweep loop gives the UI back without the PC, but an output mode
+       keeps sweeping until an operation is requested.*/
+    if (ui_off)
+      operation_requested |= OP_CONSOLE;
+#endif
 
     chSysUnlockFromISR();
     return;
