@@ -208,6 +208,15 @@ static void redraw_ui(void)
 bool ui_off = false;
 volatile bool ui_on_notice = false;     // the UI is back: "ui on" starts the next console reply
 
+// A centered line of the ui off screen: 0 the message, 1 the text of ui off "text"
+static void ui_off_line(const char *s, int line)
+{
+  int w = 0;
+  for (const char *p = s; *p; p++)
+    w += wFONT_GET_WIDTH(*p);
+  ili9341_drawstring_10x14(s, (LCD_WIDTH - w)/2, (LCD_HEIGHT - wFONT_GET_HEIGHT)/2 + line*2*wFONT_STR_HEIGHT);
+}
+
 // ui off: the screen shows a message and the console never waits for the screen. A touch or
 // the jog (ui_process), ui on, a command that needs the user (CMD_UI_ON), USB DISK mode or a
 // lost connection give the UI back.
@@ -221,10 +230,6 @@ void set_ui(bool on)
     redraw_ui();
     return;
   }
-  static const char msg[] = "Remote only mode. Touch screen to enable UI";
-  int w = 0;
-  for (const char *p = msg; *p; p++)
-    w += wFONT_GET_WIDTH(*p);
 #ifdef __SD_FILE_BROWSER__
   if (ui_mode == UI_BROWSER)            // set_ui(true) can not redraw the browser
     ui_mode_normal();
@@ -232,8 +237,27 @@ void set_ui(bool on)
   ili9341_set_foreground(LCD_FG_COLOR);
   ili9341_set_background(LCD_BG_COLOR);
   ili9341_clear_screen();
-  ili9341_drawstring_10x14(msg, (LCD_WIDTH - w)/2, (LCD_HEIGHT - wFONT_GET_HEIGHT)/2);
+  ui_off_line("Remote only mode. Touch screen to enable UI", 0);
   ui_off = true;
+}
+
+// ui off "text": the ui off screen with a line under the message, also when the UI is off
+// already, e.g. to tell the TG from the SA in a tracking generator setup of two tinySA
+void set_ui_text(char *text)
+{
+  int w = 0;
+  for (char *p = text; *p; p++) {
+    if ((uint8_t)*p > '~')              // not in the font
+      *p = '?';
+    w += wFONT_GET_WIDTH(*p);
+    if (w > LCD_WIDTH) {                // only the characters that fit on the screen
+      *p = 0;
+      break;
+    }
+  }
+  ui_off = false;                       // draw the screen again
+  set_ui(false);
+  ui_off_line(text, 1);
 }
 #endif
 

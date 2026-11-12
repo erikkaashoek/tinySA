@@ -1073,11 +1073,16 @@ VNA_SHELL_FUNCTION(cmd_ui)
     shell_printf("ui %s" VNA_SHELL_NEWLINE_STR, ui_off ? "off" : "on");
     return;
   }
-  int m = generic_option_cmd("ui", "off|on", argc, argv[0]);
-  if (m >= 0) {
-    set_ui(m);
-    ui_on_notice = false;           // the PC asked for it
+  int m = get_str_index(argv[0], "off|on");
+  if (m < 0 || argc > 2 || (argc == 2 && m)) {
+    usage_printf("ui [off [\"text\"]|on]" VNA_SHELL_NEWLINE_STR);
+    return;
   }
+  if (argc == 2)
+    set_ui_text(argv[1]);           // a line under the message, e.g. "Tracking generator"
+  else
+    set_ui(m);
+  ui_on_notice = false;             // the PC asked for it
 }
 #endif
 

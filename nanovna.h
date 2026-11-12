@@ -1679,6 +1679,7 @@ bool isFullScreenMode(void);
 extern bool ui_off;                 // the screen shows the ui off message, the drawing functions return at once
 extern volatile bool ui_on_notice;
 void set_ui(bool on);
+void set_ui_text(char *text);
 #define UI_OFF  ui_off
 #else
 #define UI_OFF  false
