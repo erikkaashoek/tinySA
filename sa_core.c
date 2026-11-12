@@ -3765,6 +3765,16 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     update_rbw();
     calculate_step_delay();
     scandirty = true;                                                       // This is the first pass with new settings
+#ifdef __FAST_SWEEP__
+    // A zero span reader that stopped early (scanraw with fewer points, an abort) left RSSI
+    // samples of its own frequency and RBW in the buffer, the next reads would return them
+#ifdef __SI4432__
+    SI4432_Fill_clear();
+#endif
+#ifdef __SI4463__
+    SI446x_Fill_clear();
+#endif
+#endif
     // Set for actual time pre calculated value (update after sweep)
     setting.actual_sweep_time_us = calc_min_sweep_time_us();
     // Change actual sweep time as user input if it greater minimum
