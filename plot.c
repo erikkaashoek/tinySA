@@ -404,6 +404,24 @@ marker_to_value(const int i)
   return(v);
 }
 
+#ifdef __NOISE_FIGURE__
+// Noise figure of marker 0 in the NF measurements, for the marker info and for nf_store
+float noise_figure(void)
+{
+  float nf = marker_to_value(0) + 173.93f - nf_gain;   // measured noise figure at 20C
+  if (setting.measurement != M_NF_TINYSA) {
+    float mnf = expf(nf/10.0f * logf(10.0f));                     // measure noise factor
+    float tnf = expf(config.noise_figure/10.0f * logf(10.0f));    // tinySA noise factor
+    float amp_gain = expf(nf_gain/10.0f * logf(10.0f));
+    float anf = mnf - (tnf - 1.0f)/amp_gain;
+    nf = 10.0f*logf(anf)/logf(10.0f);
+  }
+  // powf(10,x) =  expf(x * logf(10))
+  // log10f(x)  =  logf(x)/logf(10)
+  return nf;
+}
+#endif
+
 #ifdef TINYSA3
 float sa_sqrtf(const float x)
 {
@@ -1391,6 +1409,7 @@ draw_cell(int m, int n)
 static void
 draw_all_cells(bool flush_markmap)
 {
+  if (UI_OFF) return;                   // redraw_marker(), redraw_trigger(): draw_all() is gated already
   int m, n;
 //  START_PROFILE
   for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++){
@@ -1941,34 +1960,21 @@ static void cell_draw_marker_info(int x0, int y0)
       }
 #ifdef __NOISE_FIGURE__
     } else if (i>=2 && (setting.measurement == M_NF_TINYSA || setting.measurement == M_NF_VALIDATE || setting.measurement == M_NF_AMPLIFIER) && markers[0].enabled) {
-      float aNP = 0;
-      aNP = marker_to_value(0);
-      measured_noise_figure = aNP + 173.93 - nf_gain;   // measured noise figure at 20C
-      if (setting.measurement != M_NF_TINYSA) {
-        float mnf = expf(measured_noise_figure/10.0 * logf(10));     // measure noise factor
-        float tnf = expf(config.noise_figure/10.0 * logf(10.0));     // tinySA noise factor
-        float amp_gain = expf(nf_gain/10.0 * logf(10.0));
-        float anf = mnf - (tnf - 1.0)/amp_gain;
-        measured_noise_figure = 10.0*logf(anf)/logf(10.0);
-      }
-      // powf(10,x) =  expf(x * logf(10))
-      // log10f(x)  =  logf(x)/logf(10)
-
-
+      float nf = noise_figure();
       ili9341_set_foreground(marker_color(0));
 //        j = 1;
       int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
       int ypos = 1 + (j/2)*(16) - y0;
       if (setting.measurement == M_NF_TINYSA) {
-        cell_printf(xpos, ypos, FONT_b"TINYSA NF: %4.1f", measured_noise_figure);
+        cell_printf(xpos, ypos, FONT_b"TINYSA NF: %4.1f", nf);
       } else {
         if (setting.measurement == M_NF_VALIDATE)
-          cell_printf(xpos, ypos, FONT_b"TINYSA NF ERROR: %4.1f", measured_noise_figure);
+          cell_printf(xpos, ypos, FONT_b"TINYSA NF ERROR: %4.1f", nf);
         else
-          cell_printf(xpos, ypos, FONT_b"GAIN: %4.1fdB   NF: %4.1f", nf_gain, measured_noise_figure);
+          cell_printf(xpos, ypos, FONT_b"GAIN: %4.1fdB   NF: %4.1f", nf_gain, nf);
       }
 #ifdef __LEVEL_METER__
-        plot_printf(level_text, sizeof(level_text), "%4.1f", measured_noise_figure);
+        plot_printf(level_text, sizeof(level_text), "%4.1f", nf);
 #endif
 
       break;
@@ -2051,7 +2057,7 @@ draw_frequencies(void)
 {
   char buf1[40];
   char buf2[32];
-  if (MODE_OUTPUT(setting.mode))     // No frequencies during output
+  if (MODE_OUTPUT(setting.mode) || UI_OFF)     // No frequencies during output or ui off
     return;
   if (current_menu_is_form() && !in_selftest)
     return;
@@ -2207,6 +2213,7 @@ request_to_redraw_grid(void)
 void
 redraw_frame(void)
 {
+  if (UI_OFF) return;
   ili9341_set_background(LCD_BG_COLOR);
   ili9341_clear_screen();
   draw_frequencies();
@@ -2473,7 +2480,7 @@ set_level_meter_or_waterfall(void)
   else                                                   graph_bottom = NO_WATERFALL;
   _grid_y = graph_bottom / NGRIDY;
   area_height = AREA_HEIGHT_NORMAL;
-  if (setting.waterfall != W_OFF || setting.level_meter){
+  if ((setting.waterfall != W_OFF || setting.level_meter) && !UI_OFF){
     ili9341_set_background(LCD_BG_COLOR);
     ili9341_fill(OFFSETX, graph_bottom, LCD_WIDTH - OFFSETX, CHART_BOTTOM - graph_bottom);
   }
