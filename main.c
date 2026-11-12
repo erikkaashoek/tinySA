@@ -63,7 +63,24 @@ char shell_line[VNA_SHELL_MAX_LENGTH];
 char *shell_args[VNA_SHELL_MAX_ARGUMENTS + 1];
 uint16_t shell_nargs;
 static volatile vna_shellcmd_t  shell_function = 0;
-static volatile bool shell_function_ui;     // shell_function may also run in a UI wait loop (CMD_RUN_IN_UI)
+static volatile uint8_t shell_function_flags; // CMD_xxx of shell_function: CMD_RUN_IN_UI also runs it in a UI wait loop
+
+// Some commands can executed only in sweep thread, not in main cycle
+#define CMD_WAIT_MUTEX  1
+#define CMD_RUN_IN_LOAD 2
+#define CMD_RUN_IN_UI   4
+#ifdef __USE_USB_MSC__
+#define CMD_DISK_OK     8     // allowed in USB DISK mode, does not use SPI1 or spi_buffer
+#else
+#define CMD_DISK_OK     0
+#endif
+#ifdef __UI_OFF__
+#define CMD_UI_ON       16    // needs the user at the tinySA: ui on before it runs (with CMD_WAIT_MUTEX)
+#define CMD_BINARY      32    // binary reply: no "ui on" notice in front of it
+#else
+#define CMD_UI_ON       0
+#define CMD_BINARY      0
+#endif
 
 //#define ENABLED_DUMP
 // Allow get threads debug info
@@ -90,6 +107,7 @@ void update_frequencies(void);
 static void set_frequencies(freq_t start, freq_t stop, uint16_t points);
 static bool sweep(bool break_on_operation);
 static long_t my_atoi(const char *p);
+static bool shell_check_connect(void);
 
 uint8_t sweep_mode = SWEEP_ENABLE;
 uint16_t sweep_once_count = 1;
@@ -152,11 +170,12 @@ void shell_run_pending(bool ui_wait)
 {
   chSysLock();
   vna_shellcmd_t local_func = shell_function;
-  if (ui_wait && !shell_function_ui)
+  uint8_t local_flags = shell_function_flags;
+  if (ui_wait && !(local_flags & CMD_RUN_IN_UI))
     local_func = 0;
   else {
     shell_function = 0;
-    shell_function_ui = false;
+    shell_function_flags = 0;
     // The shell sets OP_CONSOLE together with shell_function, a request without a
     // command (direct command, timed out command) has done its job: the sweep stopped
     operation_requested &= ~OP_CONSOLE;
@@ -166,6 +185,10 @@ void shell_run_pending(bool ui_wait)
   if (local_func) {
     if (!ui_wait)                  // a UI wait loop keeps a pending touch or lever event
       operation_requested = OP_NONE; // otherwise commands will be aborted
+#ifdef __UI_OFF__
+    if (local_flags & CMD_UI_ON)   // the command needs the user at the tinySA
+      set_ui(true);
+#endif
     local_func(shell_nargs - 1, &shell_args[1]);
 
     if (ui_wait || operation_requested == OP_NONE) // Don't prompt if aborted
@@ -313,6 +336,14 @@ static THD_FUNCTION(Thread1, arg)
       msc_enter_request = false;
       operation_requested = OP_NONE;
       usb_disk_mode();
+    }
+#endif
+#ifdef __UI_OFF__
+    // An unplugged tinySA must not stay blind. The USB suspend also stops the endless sweep of
+    // an output mode (usbcfg.c), else this would only run after the next touch or command.
+    if (ui_off && !shell_check_connect()) {
+      set_ui(true);
+      ui_on_notice = false;                 // no PC to tell
     }
 #endif
 //    START_PROFILE
@@ -1037,6 +1068,26 @@ VNA_SHELL_FUNCTION(cmd_release)
   handle_touch_interrupt();
 }
 
+#endif
+
+#ifdef __UI_OFF__
+VNA_SHELL_FUNCTION(cmd_ui)
+{
+  if (argc == 0) {
+    shell_printf("ui %s" VNA_SHELL_NEWLINE_STR, ui_off ? "off" : "on");
+    return;
+  }
+  int m = get_str_index(argv[0], "off|on");
+  if (m < 0 || argc > 2 || (argc == 2 && m)) {
+    usage_printf("ui [off [\"text\"]|on]" VNA_SHELL_NEWLINE_STR);
+    return;
+  }
+  if (argc == 2)
+    set_ui_text(argv[1]);           // a line under the message, e.g. "Tracking generator"
+  else
+    set_ui(m);
+  ui_on_notice = false;             // the PC asked for it
+}
 #endif
 
 #ifdef TINYSA4
@@ -2758,15 +2809,6 @@ typedef struct {
 } VNAShellCommand;
 #pragma pack(pop)
 
-// Some commands can executed only in sweep thread, not in main cycle
-#define CMD_WAIT_MUTEX  1
-#define CMD_RUN_IN_LOAD 2
-#define CMD_RUN_IN_UI   4
-#ifdef __USE_USB_MSC__
-#define CMD_DISK_OK     8     // allowed in USB DISK mode, does not use SPI1 or spi_buffer
-#else
-#define CMD_DISK_OK     0
-#endif
 static const VNAShellCommand commands[] =
 {
     {"version"     , cmd_version     , CMD_DISK_OK},
@@ -2794,13 +2836,13 @@ static const VNAShellCommand commands[] =
 #ifdef TINYSA4
     {"hop"         , cmd_hop         , CMD_WAIT_MUTEX},
 #endif
-    {"scanraw"     , cmd_scanraw     , CMD_WAIT_MUTEX},
+    {"scanraw"     , cmd_scanraw     , CMD_WAIT_MUTEX | CMD_BINARY},
     {"abort"       , cmd_abort       , 0},
     {"zero"        , cmd_zero        , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},   // Will set the scanraw measured value offset (128 or 174)
     {"sweep"       , cmd_sweep       , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
     {"test"        , cmd_test        , 0},
-    {"touchcal"    , cmd_touchcal    , CMD_WAIT_MUTEX},
-    {"touchtest"   , cmd_touchtest   , CMD_WAIT_MUTEX},
+    {"touchcal"    , cmd_touchcal    , CMD_WAIT_MUTEX | CMD_UI_ON},
+    {"touchtest"   , cmd_touchtest   , CMD_WAIT_MUTEX | CMD_UI_ON},
     {"pause"       , cmd_pause       , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
 #ifdef TINYSA4
     {"restart"     , cmd_restart     , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
@@ -2825,11 +2867,14 @@ static const VNAShellCommand commands[] =
     {"usart"       , cmd_usart       , CMD_WAIT_MUTEX},
     {"usart_cfg"   , cmd_usart_cfg   , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
 #endif
-    {"capture"     , cmd_capture     , CMD_WAIT_MUTEX | CMD_RUN_IN_UI},
+    {"capture"     , cmd_capture     , CMD_WAIT_MUTEX | CMD_RUN_IN_UI | CMD_BINARY},
 #ifdef __REMOTE_DESKTOP__
     {"refresh"     , cmd_refresh     , CMD_DISK_OK},
     {"touch"       , cmd_touch       , CMD_DISK_OK},
     {"release"     , cmd_release     , CMD_DISK_OK},
+#endif
+#ifdef __UI_OFF__
+    {"ui"          , cmd_ui          , CMD_WAIT_MUTEX},     // draws: runs in the sweep thread
 #endif
     {"vbat"        , cmd_vbat        , CMD_WAIT_MUTEX},     // Uses same adc as touch!!!!!
 #ifdef ENABLE_VBAT_OFFSET_COMMAND
@@ -2876,15 +2921,19 @@ static const VNAShellCommand commands[] =
     { "ext_gain", cmd_ext_gain, CMD_RUN_IN_LOAD},
     { "output", cmd_output,    CMD_RUN_IN_LOAD },
     { "deviceid", cmd_deviceid,    CMD_RUN_IN_LOAD },
+#ifdef __UI_OFF__
+    { "selftest", cmd_selftest,    CMD_WAIT_MUTEX | CMD_UI_ON },    // ui on: in the sweep thread
+#else
     { "selftest", cmd_selftest,    0 },
+#endif
     { "correction", cmd_correction,   CMD_RUN_IN_LOAD },
     { "calc", cmd_calc, CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
-    { "menu", cmd_menu, CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD },
+    { "menu", cmd_menu, CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD | CMD_UI_ON },
     { "text", cmd_text, CMD_RUN_IN_LOAD},
     { "remark", cmd_remark, CMD_RUN_IN_LOAD },
 #ifdef ENABLE_SD_CARD_CMD
     { "sd_list",   cmd_sd_list,   CMD_WAIT_MUTEX },
-    { "sd_read",   cmd_sd_read,   CMD_WAIT_MUTEX },
+    { "sd_read",   cmd_sd_read,   CMD_WAIT_MUTEX | CMD_BINARY },
     { "sd_delete", cmd_sd_delete, CMD_WAIT_MUTEX },
 #endif
 #ifdef __USE_USB_MSC__
@@ -3200,6 +3249,15 @@ static void VNAShell_executeLine(char *line)
 {
   // Execute line
   const VNAShellCommand *scp = VNAShell_parceLine(line);
+#ifdef __UI_OFF__
+  // The UI came back without "ui on" (touch, jog, a command that needs the user): tell the PC
+  // here, in this thread before the reply, so it never splits other console output. Not in
+  // front of binary data, that would shift it: then before the next text reply.
+  if (ui_on_notice && !(scp && (scp->flags & CMD_BINARY))) {
+    ui_on_notice = false;
+    shell_printf("ui on" VNA_SHELL_NEWLINE_STR);
+  }
+#endif
   if (scp) {
     uint16_t cmd_flag = scp->flags;
 #ifdef __USE_USB_MSC__
@@ -3232,7 +3290,7 @@ static void VNAShell_executeLine(char *line)
     }
     if (cmd_flag & CMD_WAIT_MUTEX) {
       chSysLock();
-      shell_function_ui = cmd_flag & CMD_RUN_IN_UI;
+      shell_function_flags = cmd_flag;
       shell_function = scp->sc_function;
       operation_requested|=OP_CONSOLE;      // this will abort current sweep to give priority to the new request
       chSysUnlock();

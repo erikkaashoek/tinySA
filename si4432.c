@@ -709,6 +709,11 @@ void SI4432_Fill(int s, int start)
   buf_end = sweep_points - 1;
   buf_read = true;
 }
+
+void SI4432_Fill_clear(void)            // drop the samples a zero span reader did not use
+{
+  buf_read = false;
+}
 #endif
 
 #ifdef __LISTEN__

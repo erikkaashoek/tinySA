@@ -193,7 +193,76 @@ static void draw_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, ui_butto
 //svoid save_csv(uint8_t mask);
 //#endif
 
+#if defined(__UI_OFF__) || defined(__USE_USB_MSC__)
+// Redraw the screen after a full screen message: frame, grid and an open menu (output modes)
+static void redraw_ui(void)
+{
+  redraw_frame();
+  request_to_redraw_grid();
+  if (ui_mode != UI_NORMAL)
+    draw_menu();
+}
+#endif
+
+#ifdef __UI_OFF__
+bool ui_off = false;
+volatile bool ui_on_notice = false;     // the UI is back: "ui on" starts the next console reply
+
+// A centered line of the ui off screen: 0 the message, 1 the text of ui off "text"
+static void ui_off_line(const char *s, int line)
+{
+  int w = 0;
+  for (const char *p = s; *p; p++)
+    w += wFONT_GET_WIDTH(*p);
+  ili9341_drawstring_10x14(s, (LCD_WIDTH - w)/2, (LCD_HEIGHT - wFONT_GET_HEIGHT)/2 + line*2*wFONT_STR_HEIGHT);
+}
+
+// ui off: the screen shows a message and the console never waits for the screen. A touch or
+// the jog (ui_process), ui on, a command that needs the user (CMD_UI_ON), USB DISK mode or a
+// lost connection give the UI back.
+void set_ui(bool on)
+{
+  if (on == !ui_off)                    // no change
+    return;
+  if (on) {
+    ui_off = false;
+    ui_on_notice = true;                // cleared by "ui on" and a lost connection: no need to tell
+    redraw_ui();
+    return;
+  }
+#ifdef __SD_FILE_BROWSER__
+  if (ui_mode == UI_BROWSER)            // set_ui(true) can not redraw the browser
+    ui_mode_normal();
+#endif
+  ili9341_set_foreground(LCD_FG_COLOR);
+  ili9341_set_background(LCD_BG_COLOR);
+  ili9341_clear_screen();
+  ui_off_line("Remote only mode. Touch screen to enable UI", 0);
+  ui_off = true;
+}
+
+// ui off "text": the ui off screen with a line under the message, also when the UI is off
+// already, e.g. to tell the TG from the SA in a tracking generator setup of two tinySA
+void set_ui_text(char *text)
+{
+  int w = 0;
+  for (char *p = text; *p; p++) {
+    if ((uint8_t)*p > '~')              // not in the font
+      *p = '?';
+    w += wFONT_GET_WIDTH(*p);
+    if (w > LCD_WIDTH) {                // only the characters that fit on the screen
+      *p = 0;
+      break;
+    }
+  }
+  ui_off = false;                       // draw the screen again
+  set_ui(false);
+  ui_off_line(text, 1);
+}
+#endif
+
 bool isFullScreenMode(void) {
+  if (UI_OFF) return true;              // draw_all() and the sweep progress bar draw nothing
 #ifdef __SD_FILE_BROWSER__
   return ui_mode == UI_BROWSER;
 #else
@@ -1880,8 +1949,6 @@ UI_FUNCTION_CALLBACK(menu_curve_confirm_cb)
   menu_move_back(false);
 }
 
-float measured_noise_figure;
-
 #if 0
 UI_FUNCTION_CALLBACK(menu_noise_figure_confirm_cb)
 {
@@ -3038,6 +3105,11 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
     return;
   }
   menu_move_back(false);
+#ifdef __NOISE_FIGURE__
+  // Store the NF of a running TINYSA NF measurement: here, before markers_reset(), as the marker
+  // info would show it (with the UI off nothing draws it)
+  float nf = (data == M_NF_STORE && setting.measurement == M_NF_TINYSA) ? noise_figure() : 0;
+#endif
   markers_reset();
 
   if ((data != M_OFF && setting.measurement != M_OFF) || data == M_OFF )
@@ -3262,8 +3334,8 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       nf_gain = 0;
       goto noise_figure;
     case M_NF_STORE:
-      if (measured_noise_figure > 2 && measured_noise_figure < 20) {
-        config.noise_figure = measured_noise_figure;
+      if (nf > 2 && nf < 20) {
+        config.noise_figure = nf;
         config_save();
         data = M_NF_VALIDATE;               // Continue to validate
         goto validate;
@@ -4520,6 +4592,9 @@ void usb_disk_mode(void)
     if ((disk_initialize(0) & STA_NOINIT) || disk_ioctl(0, GET_SECTOR_COUNT, &blocks) != RES_OK || blocks == 0)
       error = "SD card error";
   }
+#ifdef __UI_OFF__
+  set_ui(true);                      // this screen needs the user
+#endif
   ili9341_set_foreground(LCD_FG_COLOR);
   ili9341_set_background(LCD_BG_COLOR);
   ili9341_clear_screen();
@@ -4565,9 +4640,8 @@ void usb_disk_mode(void)
   msc_disk_mode = false;
   touch_wait_release();
   dirty = true;                      // Restore MCU clock and hardware settings on the next sweep
-  ui_mode_normal();
-  redraw_frame();
-  request_to_redraw_grid();
+  ui_mode_normal();                  // the form menu of the output modes stays open
+  redraw_ui();
 }
 
 static UI_FUNCTION_CALLBACK(menu_usb_disk_cb) {
@@ -6582,6 +6656,7 @@ const char *month[] = { "Jan", "Feb", "Mar","Apr","May","Jun","Jul","Aug","Sep",
 
 void draw_cal_status(void)
 {
+  if (UI_OFF) return;
 #define BLEN    7
   char buf[BLEN+1];
   buf[6]=0;
@@ -7163,6 +7238,12 @@ draw_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, ui_button_t *b)
 }
 
 void drawMessageBox(const char *header, char *text, uint32_t delay){
+#ifdef __UI_OFF__
+  if (ui_off) {                         // the PC in control gets the message, without the delay
+    shell_printf("%s: %s\r\n", header, text);
+    return;
+  }
+#endif
   ui_button_t b;
   b.bg = LCD_MENU_COLOR;
   b.fg = LCD_MENU_TEXT_COLOR;
@@ -7424,6 +7505,7 @@ static const uint8_t check_box[] = {
 static void
 draw_menu_buttons(const menuitem_t *menu, uint32_t mask)
 {
+  if (UI_OFF) return;
   int i, y;
   ui_button_t button;
   const menuitem_t *m = menu;
@@ -7840,7 +7922,7 @@ leave_ui_mode()
   if (setting.waterfall)
     set_level_meter_or_waterfall();
 #ifdef __LEVEL_METER__
-  if (setting.level_meter)
+  if (setting.level_meter && !UI_OFF)
     ili9341_fill(LCD_WIDTH-MENU_BUTTON_WIDTH, area_height, MENU_BUTTON_WIDTH, menu_button_height*MENU_BUTTON_MAX - area_height);
 #endif
   redraw_request|=REDRAW_AREA | REDRAW_FREQUENCY | REDRAW_CAL_STATUS | REDRAW_BATTERY;
@@ -8834,7 +8916,7 @@ ui_process(void)
 {
 #ifdef __USE_SD_CARD__
   // SD icon repeat, only from the normal screen: a capture would close an open menu
-  if (sd_repeat && setting.interval && ui_mode == UI_NORMAL &&
+  if (sd_repeat && setting.interval && ui_mode == UI_NORMAL && !UI_OFF &&
       chVTGetSystemTimeX() - sd_repeat_start >= (systime_t)setting.interval * CH_CFG_ST_FREQUENCY)
     sd_icon_save();
 #endif
@@ -8844,9 +8926,17 @@ ui_process(void)
     selection = -1; // hide keyboard mode selection
     ui_mode_menu();
   }
+#ifdef __UI_OFF__
+  bool wake = false;                    // ui off: a jog press or a touch only gives the UI back
+#endif
   // Clear only the handled request: the shell may have set OP_CONSOLE meanwhile for a
   // waiting command, without it an output mode sweep never stops to run that command
   if ((operation_requested&OP_LEVER) || previous_button_state != button_state) {
+#ifdef __UI_OFF__
+    if (ui_off)
+      wake = btn_check() != 0;          // a press, also left or right, the release is no event
+    else
+#endif
     ui_process_lever();
     previous_button_state = button_state;
     chSysLock();
@@ -8854,11 +8944,23 @@ ui_process(void)
     chSysUnlock();
   }
   if (operation_requested&OP_TOUCH) {
+#ifdef __UI_OFF__
+    if (ui_off) {
+      if (touch_check() != EVT_TOUCH_NONE) {
+        touch_wait_release();
+        wake = true;
+      }
+    } else
+#endif
     ui_process_touch();
     chSysLock();
     operation_requested &= ~OP_TOUCH;
     chSysUnlock();
   }
+#ifdef __UI_OFF__
+  if (wake)
+    set_ui(true);
+#endif
   touch_start_watchdog();
 }
 

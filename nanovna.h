@@ -119,6 +119,7 @@
 #define __VBW__
 #define __SWEEP_RESTART__
 #define __BURST__                 // Burst modulation: TIM8 on PB9 keys the OOK of the Si4468 (GPIO1, normally CTS)
+#define __UI_OFF__                // ui off: no LCD drawing while a PC is in control, a touch gives the UI back
 // #define DIRECT_CORRECTION        // Not enough space for config in one flash page.
 #define DB_PER_DEGREE_BELOW               0.056
 #define DB_PER_DEGREE_ABOVE               0.069
@@ -419,7 +420,9 @@ extern freq_t ultra_start;
 //extern bool ultra;
 #endif
 #ifdef TINYSA4
-extern float measured_noise_figure;
+#ifdef __NOISE_FIGURE__
+float noise_figure(void);
+#endif
 extern float *drive_dBm;
 extern bool level_error;
 extern bool depth_error;
@@ -1672,6 +1675,15 @@ void refresh_sweep_menu(int i);
 void save_to_sd(int mask);
 void drawMessageBox(const char *header, char *text, uint32_t delay);
 bool isFullScreenMode(void);
+#ifdef __UI_OFF__
+extern bool ui_off;                 // the screen shows the ui off message, the drawing functions return at once
+extern volatile bool ui_on_notice;
+void set_ui(bool on);
+void set_ui_text(char *text);
+#define UI_OFF  ui_off
+#else
+#define UI_OFF  false
+#endif
 int btn_side(void);
 extern int si5351_available;
 

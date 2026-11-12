@@ -426,9 +426,25 @@ VNA_SHELL_FUNCTION(cmd_level)
   set_level(f);
 }
 
+#ifdef __UI_OFF__
+// The actual RBW and sweep time of changed settings. While paused the cal status calculates
+// them, but with the UI off it does not draw.
+static void update_actual_values(void)
+{
+  if (dirty) {
+    update_rbw();
+    calculate_step_delay();
+    setting.actual_sweep_time_us = calc_min_sweep_time_us();
+  }
+}
+#endif
+
 VNA_SHELL_FUNCTION(cmd_sweeptime)
 {
   if (argc != 1  || argv[0][0] == '?') {
+#ifdef __UI_OFF__
+    update_actual_values();
+#endif
     usage_printf("sweeptime 0.003..60\r\n%5.3Fs\r\n",((float)setting.actual_sweep_time_us)/ONE_SECOND_TIME);
     return;
   }
@@ -618,6 +634,9 @@ VNA_SHELL_FUNCTION(cmd_rbw)
 {
   if (argc != 1 || argv[0][0] == '?') {
   usage:
+#ifdef __UI_OFF__
+    update_actual_values();
+#endif
 #ifdef TINYSA4
 	usage_printf("rbw 0.2..850|auto\r\n%.1FHz\r\n", actual_rbw_x10*100.0);
 #else
@@ -1371,14 +1390,24 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
   freq_t old_step = setting.frequency_step;
   float f_step = (stop-start)/ points;
   setting.frequency_step = (freq_t)f_step;
+  // perform() recalculates for a new frequency step itself. Zero span measures a series of RSSI
+  // samples at one frequency, which needs a full setup, also for the sweep after it.
+  bool zero_span = setting.frequency_step == 0;
+  if (zero_span && points == 1) {   // one point as in a sweep: one measurement, auto RBW as in zero span
+    setting.frequency_step = setting.rbw_x10 ? setting.rbw_x10*50 : 300000;
+    zero_span = false;
+  }
 again:
   operation_requested = false;
-  dirty = true;
+  if (zero_span)
+    dirty = true;
 //  adc_stop_analog_watchdog();
   int oldpos = 0;
-  ili9341_set_background(LCD_BG_COLOR);
-  ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
-  ili9341_set_background(LCD_SWEEP_LINE_COLOR);
+  if (!UI_OFF) {                                // ui off: no progress bar
+    ili9341_set_background(LCD_BG_COLOR);
+    ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
+    ili9341_set_background(LCD_SWEEP_LINE_COLOR);
+  }
 #define BUFFER_SIZE  64
   uint8_t buf[BUFFER_SIZE];
   int idx = 0;
@@ -1395,7 +1424,7 @@ again:
       idx = 0;
     }
     int pos = i * (WIDTH+1) / points;
-    if (pos - oldpos > 8) {
+    if (pos - oldpos > 8 && !UI_OFF) {
       ili9341_fill(OFFSETX + oldpos, CHART_BOTTOM+1, pos - oldpos, 1);     // update sweep progress bar
       oldpos = pos;
     }
@@ -1405,10 +1434,13 @@ again:
 //  adc_start_analog_watchdog();
   if ((unbuffered & 2) && !operation_requested)
      goto again;
-  ili9341_set_background(LCD_BG_COLOR);
-  ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
+  if (!UI_OFF) {
+    ili9341_set_background(LCD_BG_COLOR);
+    ili9341_fill(OFFSETX, CHART_BOTTOM+1, WIDTH, 1);
+  }
   setting.frequency_step = old_step;
-  dirty = true;
+  if (zero_span)
+    dirty = true;
   redraw_request = 0; // disable screen update in this mode
 }
 

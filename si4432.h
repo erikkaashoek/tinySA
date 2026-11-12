@@ -140,6 +140,7 @@ uint16_t set_rbw(uint16_t WISH);
 void set_calibration_freq(int freq);
 #ifdef __FAST_SWEEP__
 void SI4432_Fill(int s, int start);
+void SI4432_Fill_clear(void);
 void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigger_mode);
 #if 0
 int SI4432_is_fast_mode(void);
@@ -194,6 +195,7 @@ extern si446x_info_t SI4463_info;
 pureRSSI_t getSI4463_RSSI_correction(void);
 void Si446x_getInfo(si446x_info_t* info);
 void SI446x_Fill(int s, int start);
+void SI446x_Fill_clear(void);
 void SI446x_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigger_mode);
 void SI4463_init(void);
 void set_calibration_freq(int freq);
