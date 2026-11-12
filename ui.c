@@ -193,6 +193,17 @@ static void draw_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, ui_butto
 //svoid save_csv(uint8_t mask);
 //#endif
 
+#if defined(__UI_OFF__) || defined(__USE_USB_MSC__)
+// Redraw the screen after a full screen message: frame, grid and an open menu (output modes)
+static void redraw_ui(void)
+{
+  redraw_frame();
+  request_to_redraw_grid();
+  if (ui_mode != UI_NORMAL)
+    draw_menu();
+}
+#endif
+
 #ifdef __UI_OFF__
 bool ui_off = false;
 volatile bool ui_on_notice = false;     // the UI is back: "ui on" starts the next console reply
@@ -207,10 +218,7 @@ void set_ui(bool on)
   if (on) {
     ui_off = false;
     ui_on_notice = true;                // cleared by "ui on" and a lost connection: no need to tell
-    redraw_frame();
-    request_to_redraw_grid();
-    if (ui_mode != UI_NORMAL)           // the menu of the output modes
-      draw_menu();
+    redraw_ui();
     return;
   }
   static const char msg[] = "Remote only mode. Touch screen to enable UI";
@@ -4608,9 +4616,8 @@ void usb_disk_mode(void)
   msc_disk_mode = false;
   touch_wait_release();
   dirty = true;                      // Restore MCU clock and hardware settings on the next sweep
-  ui_mode_normal();
-  redraw_frame();
-  request_to_redraw_grid();
+  ui_mode_normal();                  // the form menu of the output modes stays open
+  redraw_ui();
 }
 
 static UI_FUNCTION_CALLBACK(menu_usb_disk_cb) {
