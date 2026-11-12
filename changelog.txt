@@ -1,3 +1,8 @@
+V1.4315 2026-11-12 For all tinySA Ultra models
+- Console: "ui off" stops all drawing on the screen while a PC is in control, so commands no longer wait for the screen to be redrawn. The screen shows "Remote only mode. Touch screen to enable UI". A touch or a jog press gives the UI back, as do "ui on", unplugging USB, USB DISK mode and the commands that need the user (selftest, touchcal, touchtest, menu); the console then sends "ui on" before the reply to the next command. While the UI is off, messages such as errors go to the console. "ui" shows the state. It is not stored in the config or in presets and stays off when the mode changes
+- STORE TINYSA NF only stores the noise figure of MEASURE TINYSA NF: after VALIDATE TINYSA NF or MEASURE AMP NF it stored a wrong value
+- Leaving USB DISK mode in the signal generator shows the generator menu again, the screen stayed empty
+
 V1.4311 2026-11-11 For all tinySA models
 - Console: "measure {mode} [value]..." starts a measurement of the MEASURE menu, the values the menu asks for are the arguments, e.g. "measure channel_power 5800M 20M". Modes: off|harmonic|oip3|phase_noise|snr|3db_width|occupied_width|am|fm|thd|channel_power|linear, on the Ultra also nf_tinysa|nf_store|nf_validate|nf_amp
 - Console: "recall defaults" loads the factory settings in low input mode, as PRESET > LOAD DEFAULTS, but does not store them as the startup preset
