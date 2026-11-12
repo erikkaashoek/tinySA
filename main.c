@@ -76,8 +76,10 @@ static volatile uint8_t shell_function_flags; // CMD_xxx of shell_function: CMD_
 #endif
 #ifdef __UI_OFF__
 #define CMD_UI_ON       16    // needs the user at the tinySA: ui on before it runs (with CMD_WAIT_MUTEX)
+#define CMD_BINARY      32    // binary reply: no "ui on" notice in front of it
 #else
 #define CMD_UI_ON       0
+#define CMD_BINARY      0
 #endif
 
 //#define ENABLED_DUMP
@@ -2834,7 +2836,7 @@ static const VNAShellCommand commands[] =
 #ifdef TINYSA4
     {"hop"         , cmd_hop         , CMD_WAIT_MUTEX},
 #endif
-    {"scanraw"     , cmd_scanraw     , CMD_WAIT_MUTEX},
+    {"scanraw"     , cmd_scanraw     , CMD_WAIT_MUTEX | CMD_BINARY},
     {"abort"       , cmd_abort       , 0},
     {"zero"        , cmd_zero        , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},   // Will set the scanraw measured value offset (128 or 174)
     {"sweep"       , cmd_sweep       , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
@@ -2865,7 +2867,7 @@ static const VNAShellCommand commands[] =
     {"usart"       , cmd_usart       , CMD_WAIT_MUTEX},
     {"usart_cfg"   , cmd_usart_cfg   , CMD_WAIT_MUTEX | CMD_RUN_IN_LOAD},
 #endif
-    {"capture"     , cmd_capture     , CMD_WAIT_MUTEX | CMD_RUN_IN_UI},
+    {"capture"     , cmd_capture     , CMD_WAIT_MUTEX | CMD_RUN_IN_UI | CMD_BINARY},
 #ifdef __REMOTE_DESKTOP__
     {"refresh"     , cmd_refresh     , CMD_DISK_OK},
     {"touch"       , cmd_touch       , CMD_DISK_OK},
@@ -2931,7 +2933,7 @@ static const VNAShellCommand commands[] =
     { "remark", cmd_remark, CMD_RUN_IN_LOAD },
 #ifdef ENABLE_SD_CARD_CMD
     { "sd_list",   cmd_sd_list,   CMD_WAIT_MUTEX },
-    { "sd_read",   cmd_sd_read,   CMD_WAIT_MUTEX },
+    { "sd_read",   cmd_sd_read,   CMD_WAIT_MUTEX | CMD_BINARY },
     { "sd_delete", cmd_sd_delete, CMD_WAIT_MUTEX },
 #endif
 #ifdef __USE_USB_MSC__
@@ -3245,16 +3247,17 @@ static int VNAShell_readLine(char *line, int max_size)
 //
 static void VNAShell_executeLine(char *line)
 {
+  // Execute line
+  const VNAShellCommand *scp = VNAShell_parceLine(line);
 #ifdef __UI_OFF__
   // The UI came back without "ui on" (touch, jog, a command that needs the user): tell the PC
-  // here, in this thread before the reply, so it never splits other console output
-  if (ui_on_notice) {
+  // here, in this thread before the reply, so it never splits other console output. Not in
+  // front of binary data, that would shift it: then before the next text reply.
+  if (ui_on_notice && !(scp && (scp->flags & CMD_BINARY))) {
     ui_on_notice = false;
     shell_printf("ui on" VNA_SHELL_NEWLINE_STR);
   }
 #endif
-  // Execute line
-  const VNAShellCommand *scp = VNAShell_parceLine(line);
   if (scp) {
     uint16_t cmd_flag = scp->flags;
 #ifdef __USE_USB_MSC__
