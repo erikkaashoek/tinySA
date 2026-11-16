@@ -3228,6 +3228,7 @@ freq_t spur_IF = static_spur_IF;
 #define SI4468_LOW_IF       468750          // Si4468 receiver IF: 30 MHz / 64
 enum { SPUR_A4, SPUR_C3M, SPUR_C3P, SPUR_B2, SPUR_A3, SPUR_FAMILIES };    // 266.95, 355.78, 356.10, 533.91, 712.50 MHz
 static freq_t spur_family_freq[SPUR_FAMILIES];
+static freq_t spur_family_lo[SPUR_FAMILIES], spur_family_hi[SPUR_FAMILIES];   // inputs that can put a product within 2 RBW
 static const uint8_t spur_family_k1[SPUR_FAMILIES] = { 4, 3, 3, 2, 3 };
 static const uint8_t spur_family_kc[SPUR_FAMILIES] = { 5, 4, 4, 3, 5 };
 static const uint8_t spur_family_ks[SPUR_FAMILIES] = { 1, 1, 1, 1, 2 };
@@ -3358,6 +3359,14 @@ void fill_spur_table(void)
     spur_family_freq[SPUR_C3P] = (corr_IF - 3*SI4468_LOW_IF)/3;
     spur_family_freq[SPUR_B2]  = (corr_IF - 4*SI4468_LOW_IF)/2;
     spur_family_freq[SPUR_A3]  = (2*corr_IF - 4*SI4468_LOW_IF)/3;
+    int32_t shift = (actual_rbw_x10 > 2000 ? DEFAULT_SPUR_OFFSET : DEFAULT_SPUR_OFFSET/2);
+    for (int i = 0; i < SPUR_FAMILIES; i++) {
+      freq_t w = (actual_rbw_x10 * 200 + spur_family_ks[i] * shift) / spur_family_k1[i] + 250000;  // also with the IF shift
+      spur_family_lo[i] = spur_family_freq[i] - w;
+      spur_family_hi[i] = spur_family_freq[i] + w;
+      if ((i == SPUR_C3M || i == SPUR_C3P) && actual_rbw_x10 > 1000)  // -98 dBm: below the noise above 100 kHz RBW
+        spur_family_hi[i] = 0;
+    }
   } else
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
   if (!hw_if)
@@ -3465,14 +3474,9 @@ static int32_t spur_family_distance(freq_t lf, freq_t target_f, freq_t L, int in
   int32_t c = LO_IF_correction(L, target_f, inverted_f);
   int32_t dist = INT32_MAX;
   for (int i = 0; i < SPUR_FAMILIES; i++) {
-    if ((i == SPUR_C3M || i == SPUR_C3P) && actual_rbw_x10 > 1000)   // -98 dBm: below the noise above 100 kHz RBW
+    if (lf < spur_family_lo[i] || lf > spur_family_hi[i])
       continue;
-    int k1 = spur_family_k1[i];
-    freq_t f = spur_family_freq[i];
-    freq_t w = (actual_rbw_x10 * 200 + spur_family_ks[i] * shift) / k1 + 250000;   // holds any product within 2 RBW
-    if (lf + w < f || lf > f + w)
-      continue;
-    int32_t o = k1 * ((int32_t)(lf - f) + e) - spur_family_kc[i] * c - spur_family_ks[i] * shift;
+    int32_t o = spur_family_k1[i] * ((int32_t)(lf - spur_family_freq[i]) + e) - spur_family_kc[i] * c - spur_family_ks[i] * shift;
     if (o < 0)
       o = -o;
     if (o < dist) {
@@ -4730,7 +4734,8 @@ again:                                                              // Spur redu
         }
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
-        else if (max2871 && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
+        else if (max2871 && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_A3]           // families sorted by frequency
+                 && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
                  && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
                  && !LO_shifting && !LO_spur_shifted) {
           // Plan the LO, avoid the spur family products it would put in the RBW filter, then set it
