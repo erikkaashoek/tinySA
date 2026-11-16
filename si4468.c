@@ -518,10 +518,8 @@ static uint32_t adf4350_get_O(uint64_t freqHz) {
   }
 }
 
-freq_t xtal;
-
-uint64_t ADF4351_set_frequency(int channel, uint64_t freqHz) {
-  (void) channel;
+// Calculate the PLL setting for freqHz without changing the chip state: ADF4351_commit_frequency() sends it
+freq_t ADF4351_plan_frequency(uint64_t freqHz, ADF4351_plan_t *p) {
   // RFout = xtalFreqHz � (N + FRAC/MOD) = xtalFreqHz � (N * MOD + FRAC) / MOD
   // step = xtalFreqHz / MOD; !!!! should get integer result, also this result should divided by 16
   // for 24M step = 24M / 4000 = 6k and 6k/16 = 375
@@ -529,6 +527,8 @@ uint64_t ADF4351_set_frequency(int channel, uint64_t freqHz) {
   // N * 4000 + frac = Nx
   // N    = Nx / 4000
   // frac = Nx % 4000
+  freq_t xtal;
+  uint16_t N, frac, out_div;
 #if 1
   out_div = adf4350_get_O(freqHz);
 #ifdef __SI5351__
@@ -586,14 +586,32 @@ uint64_t ADF4351_set_frequency(int channel, uint64_t freqHz) {
   freq_t actual_freq = ((uint64_t)xtal *(N * modulus +frac))/ (1<<out_div) / modulus;
 #endif
 
+  p->N = N;
+  p->frac = frac;
+  p->out_div = out_div;
+  p->actual = actual_freq;
+  return actual_freq;
+}
 
-  if (prev_actual_freq == actual_freq)
+// Program a setting calculated by ADF4351_plan_frequency()
+freq_t ADF4351_commit_frequency(const ADF4351_plan_t *p) {
+  out_div = p->out_div;
+  N = p->N;
+  frac = p->frac;
+  if (prev_actual_freq == p->actual)
     return prev_actual_freq;
-  prev_actual_freq = actual_freq;
+  prev_actual_freq = p->actual;
 
   ADF4351_frequency_changed = true;
   sendConfig();
-  return actual_freq;
+  return p->actual;
+}
+
+uint64_t ADF4351_set_frequency(int channel, uint64_t freqHz) {
+  (void) channel;
+  ADF4351_plan_t p;
+  ADF4351_plan_frequency(freqHz, &p);
+  return ADF4351_commit_frequency(&p);
 }
 
 void ADF4351_force_refresh(void) {

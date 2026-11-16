@@ -3221,6 +3221,17 @@ static  freq_t *spur_table = (freq_t *)static_spur_table;
 int spur_table_size = STATIC_SPUR_TABLE_SIZE;
 freq_t spur_IF = static_spur_IF;
 
+// Spur families of the MAX2871 units: LO harmonics mixing with the Si4468 VCO (4 * (IF - SI4468_LOW_IF)).
+// With the LO error e and the part c of it the Si4468 takes up, a family's product lands at
+// k1 * (lf + e - f) - kc * c - ks * shift from the receive frequency; f is its input frequency at the
+// nominal IF, shift an IF shift on top of that.
+#define SI4468_LOW_IF       468750          // Si4468 receiver IF: 30 MHz / 64
+enum { SPUR_A4, SPUR_C3M, SPUR_C3P, SPUR_B2, SPUR_A3, SPUR_FAMILIES };    // 266.95, 355.78, 356.10, 533.91, 712.50 MHz
+static freq_t spur_family_freq[SPUR_FAMILIES];
+static const uint8_t spur_family_k1[SPUR_FAMILIES] = { 4, 3, 3, 2, 3 };
+static const uint8_t spur_family_kc[SPUR_FAMILIES] = { 5, 4, 4, 3, 5 };
+static const uint8_t spur_family_ks[SPUR_FAMILIES] = { 1, 1, 1, 1, 2 };
+
 #endif
 
 int binary_search(freq_t f)
@@ -3341,22 +3352,31 @@ void fill_spur_table(void)
 //  dynamic_spur_table[dynamic_spur_table_size++] = 153000000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 174600000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 219000000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
+  if (max2871) {            // these spurs are found from the actual LO setting by spur_family_distance()
+    spur_family_freq[SPUR_A4]  = (corr_IF - 4*SI4468_LOW_IF)/4;
+    spur_family_freq[SPUR_C3M] = (corr_IF - 5*SI4468_LOW_IF)/3;
+    spur_family_freq[SPUR_C3P] = (corr_IF - 3*SI4468_LOW_IF)/3;
+    spur_family_freq[SPUR_B2]  = (corr_IF - 4*SI4468_LOW_IF)/2;
+    spur_family_freq[SPUR_A3]  = (2*corr_IF - 4*SI4468_LOW_IF)/3;
+  } else
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
   if (!hw_if)
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2 + 60000;
   else
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 - 400000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
-  if (actual_rbw_x10 < 3000) {
-        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor + 10000;
+  if (!max2871) {
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
+    if (actual_rbw_x10 < 3000) {
+          dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor + 10000;
+    }
+//    if (actual_rbw_x10 < 1000 && hw_if) {
+//          dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 120000;
+//          dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 170000;
+//    }
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3;
   }
-//  if (actual_rbw_x10 < 1000 && hw_if) {
-//        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 120000;
-//        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 170000;
-//  }
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3;
   if (actual_rbw_x10 < 6000 && hw_if) {
         dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3 + 160000;
   }
@@ -3411,6 +3431,56 @@ enum {avoid_auto, avoid_off, avoid_on};
 
 void set_avoid(int s) {
   avoid_setting = s;
+}
+
+#define MAX_COMPENSATION    50000           // LO error the Si4468 takes up before the LO is set again
+
+// True when perform() sets the LO for target_f: set_freq() skips an unchanged target
+static bool LO_retune(freq_t target_f)
+{
+  freq_t L = real_old_freq[ADF4351_LO];
+  return (target_f < L - MAX_COMPENSATION || target_f > L + MAX_COMPENSATION) && old_freq[ADF4351_LO] != target_f;
+}
+
+// Correction of the Si4468 frequency for the LO at L instead of target_f
+static int32_t LO_IF_correction(freq_t L, freq_t target_f, int inverted_f)
+{
+  if (!(actual_rbw_x10 < 3000 || setting.frequency_step < 100000))  //TODO always compensate for the moment as this eliminates artifacts at larger RBW
+    return 0;
+  int32_t error_f = (int32_t)(L - target_f);
+  if (inverted_f)
+    error_f = -error_f;
+  if (LO_harmonic)
+    return error_f * setting.harmonic;
+  if (error_f > actual_rbw_x10 * 5 || error_f < - actual_rbw_x10 * 5)   //RBW / 20
+    return error_f;
+  return 0;
+}
+
+// Distance from the receive frequency of the nearest spur family product with the LO at L, INT32_MAX when
+// none is near. target_f = lf + nominal IF + shift.
+static int32_t spur_family_distance(freq_t lf, freq_t target_f, freq_t L, int inverted_f, int32_t shift, int *family)
+{
+  int32_t e = (int32_t)(L - target_f);
+  int32_t c = LO_IF_correction(L, target_f, inverted_f);
+  int32_t dist = INT32_MAX;
+  for (int i = 0; i < SPUR_FAMILIES; i++) {
+    if ((i == SPUR_C3M || i == SPUR_C3P) && actual_rbw_x10 > 1000)   // -98 dBm: below the noise above 100 kHz RBW
+      continue;
+    int k1 = spur_family_k1[i];
+    freq_t f = spur_family_freq[i];
+    freq_t w = (actual_rbw_x10 * 200 + spur_family_ks[i] * shift) / k1 + 250000;   // holds any product within 2 RBW
+    if (lf + w < f || lf > f + w)
+      continue;
+    int32_t o = k1 * ((int32_t)(lf - f) + e) - spur_family_kc[i] * c - spur_family_ks[i] * shift;
+    if (o < 0)
+      o = -o;
+    if (o < dist) {
+      dist = o;
+      *family = i;
+    }
+  }
+  return dist;
 }
 #endif
 
@@ -4660,43 +4730,51 @@ again:                                                              // Spur redu
         }
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
-        else {
-#define MAX_COMPENSATION    50000
+        else if (max2871 && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
+                 && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
+                 && !LO_shifting && !LO_spur_shifted) {
+          // Plan the LO, avoid the spur family products it would put in the RBW filter, then set it
+          ADF4351_plan_t plan;
+          bool retune = LO_retune(target_f);
+          freq_t L = (retune ? ADF4351_plan_frequency(target_f, &plan) : real_old_freq[ADF4351_LO]);
+          int family = -1;
+          int32_t dist = spur_family_distance(lf, target_f, L, inverted_f, 0, &family);
+          if (dist < actual_rbw_x10 * 200 && (!debug_avoid || debug_avoid_second)) {   // within 2 RBW: less than 50 dB suppression
+            if (family == SPUR_A4) {                                     // below IF, as the spur table for the lowest spurs
+              if (debug_avoid) stored_t[i] = -60.0;                      // Display when to do spur shift in the stored trace
+              setting.below_IF = S_AUTO_ON;
+              target_f = local_IF - lf;
+              retune = LO_retune(target_f);
+              if (retune)
+                ADF4351_plan_frequency(target_f, &plan);
+            } else {                                                     // shift the IF if that moves the products further away
+              int32_t shift = (actual_rbw_x10 > 2000 ? DEFAULT_SPUR_OFFSET : DEFAULT_SPUR_OFFSET/2);
+              freq_t shifted_f = target_f + shift;
+              ADF4351_plan_t shifted_plan;
+              bool shifted_retune = LO_retune(shifted_f);
+              freq_t shifted_L = (shifted_retune ? ADF4351_plan_frequency(shifted_f, &shifted_plan) : real_old_freq[ADF4351_LO]);
+              if (spur_family_distance(lf, shifted_f, shifted_L, inverted_f, shift, &family) > dist) {
+                if (debug_avoid) stored_t[i] = -60.0;                    // Display when to do spur shift in the stored trace
+                local_IF += shift;
+                LO_spur_shifted = true;
+                target_f = shifted_f;
+                retune = shifted_retune;
+                if (retune)
+                  plan = shifted_plan;
+              }
+            }
+          }
+          if (retune) {                                                  // as set_freq(ADF4351_LO, target_f)
+            real_old_freq[ADF4351_LO] = ADF4351_commit_frequency(&plan);
+            old_freq[ADF4351_LO] = target_f;
+          }
+        } else {
           if ( target_f < real_old_freq[ADF4351_LO] - MAX_COMPENSATION || target_f > real_old_freq[ADF4351_LO] + MAX_COMPENSATION )
             set_freq(ADF4351_LO, target_f);
         }
 
 #if 1                                                               // Compensate frequency ADF4350 error with SI4468
-        if (actual_rbw_x10 < 3000 || setting.frequency_step < 100000) { //TODO always compensate for the moment as this eliminates artifacts at larger RBW
-        int32_t error_f = 0;
-        if (real_old_freq[ADF4351_LO] > target_f) {
-          error_f = real_old_freq[ADF4351_LO] - target_f;
-
-          if (inverted_f) {
-            error_f = -error_f;
-            goto correct_min;
-          }
-        correct_plus:
-         if (LO_harmonic)
-            error_f *= setting.harmonic;
-          if (error_f > actual_rbw_x10 * 5 || LO_harmonic) {        //RBW / 4
-            local_IF += error_f;
-          }
-        } else if ( real_old_freq[ADF4351_LO] < target_f) {
-          error_f = real_old_freq[ADF4351_LO] - target_f;
-          if (inverted_f) {
-            error_f = -error_f;
-            goto correct_plus;
-          }
-        correct_min:
-          if (LO_harmonic) {
-            error_f *= setting.harmonic;
-          }
-          if ( error_f < - actual_rbw_x10 * 5 || LO_harmonic) {    //RBW / 4
-            local_IF += error_f;
-          }
-        }
-        }
+        local_IF += LO_IF_correction(real_old_freq[ADF4351_LO], target_f, inverted_f);
 #endif
       } else if (setting.mode == M_HIGH || direct) {        // direct means PATH_DIRECT or PATH_LEAKAGE
         if (signal_path == PATH_DIRECT) {
