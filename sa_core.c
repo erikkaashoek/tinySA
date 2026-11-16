@@ -3221,7 +3221,8 @@ static  freq_t *spur_table = (freq_t *)static_spur_table;
 int spur_table_size = STATIC_SPUR_TABLE_SIZE;
 freq_t spur_IF = static_spur_IF;
 
-// Spur families of the MAX2871 units: LO harmonics mixing with the Si4468 VCO (4 * (IF - SI4468_LOW_IF)).
+// Spur families of the units with the hardware IF (ZS406, ZS407): LO harmonics mixing with the Si4468 VCO
+// (4 * (IF - SI4468_LOW_IF)).
 // With the LO error e and the part c of it the Si4468 takes up, a family's product lands at
 // k1 * (lf + e - f) - kc * c - ks * shift from the receive frequency; f is its input frequency at the
 // nominal IF, shift an IF shift on top of that.
@@ -3353,7 +3354,7 @@ void fill_spur_table(void)
 //  dynamic_spur_table[dynamic_spur_table_size++] = 153000000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 174600000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 219000000;
-  if (max2871) {            // these spurs are found from the actual LO setting by spur_family_distance()
+  if (hw_if) {              // these spurs are found from the actual LO setting by spur_family_distance()
     spur_family_freq[SPUR_A4]  = (corr_IF - 4*SI4468_LOW_IF)/4;
     spur_family_freq[SPUR_C3M] = (corr_IF - 5*SI4468_LOW_IF)/3;
     spur_family_freq[SPUR_C3P] = (corr_IF - 3*SI4468_LOW_IF)/3;
@@ -3373,7 +3374,7 @@ void fill_spur_table(void)
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2 + 60000;
   else
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 - 400000;
-  if (!max2871) {
+  if (!hw_if) {
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
@@ -4743,7 +4744,7 @@ again:                                                              // Spur redu
         }
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
-        else if (max2871 && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_A3]           // families sorted by frequency
+        else if (hw_if && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_A3]             // families sorted by frequency
                  && spur_family_window(lf) && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
                  && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
                  && !LO_shifting && !LO_spur_shifted) {
