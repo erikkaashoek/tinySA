@@ -3466,6 +3466,15 @@ static int32_t LO_IF_correction(freq_t L, freq_t target_f, int inverted_f)
   return 0;
 }
 
+// True when lf is in a family window: elsewhere no product comes within 2 RBW
+static bool spur_family_window(freq_t lf)
+{
+  for (int i = 0; i < SPUR_FAMILIES; i++)
+    if (lf >= spur_family_lo[i] && lf <= spur_family_hi[i])
+      return true;
+  return false;
+}
+
 // Distance from the receive frequency of the nearest spur family product with the LO at L, INT32_MAX when
 // none is near. target_f = lf + nominal IF + shift.
 static int32_t spur_family_distance(freq_t lf, freq_t target_f, freq_t L, int inverted_f, int32_t shift, int *family)
@@ -4735,7 +4744,7 @@ again:                                                              // Spur redu
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
         else if (max2871 && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_A3]           // families sorted by frequency
-                 && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
+                 && spur_family_window(lf) && setting.mode == M_LOW && signal_path == PATH_LOW && !tracking && setting.auto_IF && config.frequency_IF2 == 0
                  && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
                  && !LO_shifting && !LO_spur_shifted) {
           // Plan the LO, avoid the spur family products it would put in the RBW filter, then set it
