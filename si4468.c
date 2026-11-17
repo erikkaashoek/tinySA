@@ -2549,7 +2549,7 @@ void SI4463_set_IF(int band) {
 static const uint8_t if_freq_high[6] = { 0x03, 0x03, 0x03, 0x03, 0, 0x02};
 static const uint8_t if_freq_low[6] =  { 0xc0, 0x60, 0x80, 0x40, 0, 0x80};
 
-  uint8_t data3[] = { 0x11, 0x20, 0x03, 0x1b, if_freq_high[band], if_freq_low[band] };
+  uint8_t data3[] = { 0x11, 0x20, 0x03, 0x1b, if_freq_high[band], if_freq_low[band], 0x00 };   // three property bytes
   SI4463_do_api(data3, sizeof(data3), NULL, 0);
 }
 
