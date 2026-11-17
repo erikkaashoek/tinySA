@@ -162,6 +162,12 @@ void   ADF4351_Setup(void);
 void ADF4351_WriteRegister32(int channel, const uint32_t value);
 void ADF4351_Latch(void);
 uint64_t ADF4351_set_frequency(int channel, uint64_t freq);
+typedef struct {
+  freq_t actual;                        // frequency the setting gives
+  uint16_t N, frac, out_div;
+} ADF4351_plan_t;
+freq_t ADF4351_plan_frequency(uint64_t freqHz, ADF4351_plan_t *p);
+freq_t ADF4351_commit_frequency(const ADF4351_plan_t *p);
 uint64_t ADF4351_prepare_frequency(int channel, uint64_t freq);
 //int ADF4351_set_frequency_with_offset(uint32_t freq, int offset, uint8_t drive_strength);
 void ADF4351_Set(int channel);

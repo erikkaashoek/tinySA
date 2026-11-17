@@ -96,6 +96,9 @@ int linear_averaging = true;
 static freq_t old_freq[5] = { 0, 0, 0, 0,0};
 static freq_t real_old_freq[5] = { 0, 0, 0, 0,0};
 static long real_offset = 0;
+#ifdef TINYSA4
+static int old_delta = 0x20000;           // Si4468 offset register value set by set_freq() in fast mode
+#endif
 
 static float old_temp = 0.0;
 static int LO_spur_shifted;
@@ -2660,7 +2663,6 @@ void set_freq(int V, freq_t freq)    // translate the requested frequency into a
         delta = delta >> 1;
       delta = ((float)delta) / OFFSET_STEP;     // Calculate and set the offset register i.s.o programming a new frequency
       if (delta > - 0x7fff && delta < 0x7fff) { // and requested frequency can be reached by using the offset registers
-        static  int old_delta = 0x20000;
         if (old_delta != delta) {
           si_set_offset(delta);               // Signal offset changed so RSSI retrieval is delayed for frequency settling
           old_delta = delta;
@@ -2671,6 +2673,7 @@ void set_freq(int V, freq_t freq)    // translate the requested frequency into a
     fast_counter = 0;                                    // Offset tuning not possible
     real_offset = 0;
     real_old_freq[V] = SI4463_set_freq(freq);           // Not in fast mode
+    old_delta = 0x20000;                                // SI4463_set_freq() cleared the offset register
   }
 done:
 #endif
@@ -3221,6 +3224,29 @@ static  freq_t *spur_table = (freq_t *)static_spur_table;
 int spur_table_size = STATIC_SPUR_TABLE_SIZE;
 freq_t spur_IF = static_spur_IF;
 
+// Spur families of the units with the hardware IF (ZS406, ZS407): harmonics of the LO (2L, 3L, 4L) leak into the
+// Si4468 and are received through the 3rd, 4th and 5th harmonic of its own LO, which sits SI4468_LOW_IF below
+// the receive frequency (bench 2026-11-16/17, doc/spur_reduction_proposal.md).
+// With the LO error e and the part c of it the Si4468 takes up, a family's product lands at
+// k1 * (lf + e - f) - kc * c - ks * shift from the receive frequency; f is its input frequency at the
+// nominal IF, shift an IF shift on top of that, ks = kc - k1.
+#define SI4468_LOW_IF       468750          // Si4468 receiver IF: 30 MHz / 64
+#define SPUR_SHIFT_MAX      450000          // largest IF shift: stays inside the BPF with IF1 0.5 MHz off
+enum { SPUR_A4, SPUR_C3M, SPUR_C3P, SPUR_B2, SPUR_A3, SPUR_B5, SPUR_FAMILIES };   // 266.95, 355.78, 356.10, 533.91, 712.50, 1603.60 MHz
+static uint32_t spur_family_freq[SPUR_FAMILIES];
+static uint32_t spur_family_lo[SPUR_FAMILIES], spur_family_hi[SPUR_FAMILIES];   // inputs that can put a product within D
+static const uint8_t spur_family_k1[SPUR_FAMILIES] = { 4, 3, 3, 2, 3, 2 };
+static const uint8_t spur_family_kc[SPUR_FAMILIES] = { 5, 4, 4, 3, 5, 5 };
+static const uint8_t spur_family_ks[SPUR_FAMILIES] = { 1, 1, 1, 1, 2, 3 };
+
+// Required distance of a family product from the receive frequency. The RBW filter gives about 47 dB at 2 RBW;
+// the strongest family (B2, -73 dBm on the ZS407) needs more where the floor is lower, less at wide RBW.
+static int32_t spur_family_D(void)
+{
+  int d10 = (actual_rbw_x10 >= 3000 ? 15 : actual_rbw_x10 >= 300 ? 20 : actual_rbw_x10 >= 30 ? 25 : 30);  // RBW/10
+  return (int32_t)actual_rbw_x10 * 10 * d10;      // RBW = actual_rbw_x10 * 100 Hz
+}
+
 #endif
 
 int binary_search(freq_t f)
@@ -3341,26 +3367,35 @@ void fill_spur_table(void)
 //  dynamic_spur_table[dynamic_spur_table_size++] = 153000000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 174600000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 219000000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
-  if (!hw_if)
+  if (hw_if) {              // all internal spurs of these units are found from the actual LO setting by
+                            // spur_family_offset(); the table stays empty (the former entries IF/4 - 400 kHz,
+                            // 2IF/3 + 160 kHz and 3IF/2 held no line of their own, bench 2026-11-16/17)
+    spur_family_freq[SPUR_A4]  = (corr_IF - 4*SI4468_LOW_IF)/4;
+    spur_family_freq[SPUR_C3M] = (corr_IF - 5*SI4468_LOW_IF)/3;
+    spur_family_freq[SPUR_C3P] = (corr_IF - 3*SI4468_LOW_IF)/3;
+    spur_family_freq[SPUR_B2]  = (corr_IF - 4*SI4468_LOW_IF)/2;
+    spur_family_freq[SPUR_A3]  = (2*corr_IF - 4*SI4468_LOW_IF)/3;
+    spur_family_freq[SPUR_B5]  = (3*corr_IF - 4*SI4468_LOW_IF)/2;
+    int32_t D = spur_family_D();
+    for (int i = 0; i < SPUR_FAMILIES; i++) {
+      uint32_t w = (D + spur_family_ks[i] * SPUR_SHIFT_MAX) / spur_family_k1[i] + 250000;  // also with the largest IF shift
+      spur_family_lo[i] = spur_family_freq[i] - w;
+      spur_family_hi[i] = spur_family_freq[i] + w;
+      if ((i == SPUR_C3M || i == SPUR_C3P) && actual_rbw_x10 > 1000)  // -98 dBm: below the noise above 100 kHz RBW
+        spur_family_hi[i] = 0;
+    }
+  } else {
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
     dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2 + 60000;
-  else
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 - 400000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
-  if (actual_rbw_x10 < 3000) {
-        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor + 10000;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
+    if (actual_rbw_x10 < 3000) {
+          dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor + 10000;
+    }
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3;
+    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*3/2 -spur_factor*3/2;
   }
-//  if (actual_rbw_x10 < 1000 && hw_if) {
-//        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 120000;
-//        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 - spur_factor + 170000;
-//  }
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3;
-  if (actual_rbw_x10 < 6000 && hw_if) {
-        dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3 + 160000;
-  }
-  dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*3/2 -spur_factor*3/2;
   spur_table = dynamic_spur_table;
   spur_table_size = dynamic_spur_table_size;
 #if 0
@@ -3411,6 +3446,60 @@ enum {avoid_auto, avoid_off, avoid_on};
 
 void set_avoid(int s) {
   avoid_setting = s;
+}
+
+#define MAX_COMPENSATION    50000           // LO error the Si4468 takes up before the LO is set again
+
+// True when perform() sets the LO for target_f: set_freq() skips an unchanged target
+static bool LO_retune(freq_t target_f)
+{
+  freq_t L = real_old_freq[ADF4351_LO];
+  return (target_f < L - MAX_COMPENSATION || target_f > L + MAX_COMPENSATION) && old_freq[ADF4351_LO] != target_f;
+}
+
+// Correction of the Si4468 frequency for the LO at L instead of target_f
+static int32_t LO_IF_correction(freq_t L, freq_t target_f, int inverted_f)
+{
+  if (!(actual_rbw_x10 < 3000 || setting.frequency_step < 100000))  //TODO always compensate for the moment as this eliminates artifacts at larger RBW
+    return 0;
+  int32_t error_f = (int32_t)(L - target_f);
+  if (inverted_f)
+    error_f = -error_f;
+  if (LO_harmonic)
+    return error_f * setting.harmonic;
+  if (error_f > actual_rbw_x10 * 5 || error_f < - actual_rbw_x10 * 5)   //RBW / 20
+    return error_f;
+  return 0;
+}
+
+// True when lf is in a family window: elsewhere no product comes within 2 RBW
+static bool spur_family_window(freq_t lf)
+{
+  for (int i = 0; i < SPUR_FAMILIES; i++)
+    if (lf >= spur_family_lo[i] && lf <= spur_family_hi[i])
+      return true;
+  return false;
+}
+
+// Signed offset from the receive frequency of the nearest spur family product with the LO at L, INT32_MAX when
+// none is near. target_f = lf + nominal IF + shift.
+static int32_t spur_family_offset(freq_t lf, freq_t target_f, freq_t L, int inverted_f, int32_t shift, int *family)
+{
+  int32_t e = (int32_t)(L - target_f);
+  int32_t c = LO_IF_correction(L, target_f, inverted_f);
+  int32_t best = INT32_MAX, dist = INT32_MAX;
+  for (int i = 0; i < SPUR_FAMILIES; i++) {
+    if (lf < spur_family_lo[i] || lf > spur_family_hi[i])
+      continue;
+    int32_t o = spur_family_k1[i] * ((int32_t)(lf - spur_family_freq[i]) + e) - spur_family_kc[i] * c - spur_family_ks[i] * shift;
+    int32_t a = (o < 0 ? -o : o);
+    if (a < dist) {
+      dist = a;
+      best = o;
+      *family = i;
+    }
+  }
+  return best;
 }
 #endif
 
@@ -4660,43 +4749,92 @@ again:                                                              // Spur redu
         }
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
-        else {
-#define MAX_COMPENSATION    50000
+        else if (hw_if && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_B5]             // families sorted by frequency
+                 && spur_family_window(lf) && setting.mode == M_LOW && (signal_path == PATH_LOW || signal_path == PATH_ULTRA)
+                 && !tracking && setting.auto_IF && config.frequency_IF2 == 0
+                 && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
+                 && !LO_shifting && !LO_spur_shifted) {
+          // Plan the LO, move the spur family products it would put in the RBW filter, then set it
+          ADF4351_plan_t plan;
+          bool retune = LO_retune(target_f);
+          freq_t L = (retune ? ADF4351_plan_frequency(target_f, &plan) : real_old_freq[ADF4351_LO]);
+          int family = -1;
+          int32_t o = spur_family_offset(lf, target_f, L, inverted_f, 0, &family);
+          int32_t D = spur_family_D();
+          if (o != INT32_MAX && o < D && o > -D && (!debug_avoid || debug_avoid_second)) {
+            // With the LO exactly at target_f the product sits at o_ref; it moves by -ks for every Hz the LO is set
+            // higher. Find the LO grid point nearest to target_f, in either direction, that puts the product at least D
+            // away, and shift the IF by that LO move: the Si4468 then needs no compensation (IF_rx = L' - lf).
+            int ks = spur_family_ks[family];
+            int f2;
+            int32_t o_ref = spur_family_offset(lf, target_f, target_f, inverted_f, 0, &f2);
+            int32_t need[2] = { (o_ref + D + ks - 1) / ks, -((D - o_ref + ks - 1) / ks) };    // LO above / below target_f
+            int32_t nudge = (D / 8 > 2500 ? D / 8 : 2500);
+            ADF4351_plan_t best_plan = {0};
+            freq_t best_f = target_f;
+            int32_t best_s = 0, best_cost = INT32_MAX, best_a = (o < 0 ? -o : o);
+            for (int dir = 0; dir < 2; dir++) {
+              int32_t s = need[dir];
+              for (int tries = 0; tries < 3; tries++) {
+                if (s > SPUR_SHIFT_MAX || s < -SPUR_SHIFT_MAX)
+                  break;
+                ADF4351_plan_t p;
+                int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + s, &p) - target_f);
+                int32_t o2 = o_ref - ks * dL;
+                int32_t a2 = (o2 < 0 ? -o2 : o2), cost = (dL < 0 ? -dL : dL);
+                if (a2 >= D) {
+                  if (cost < best_cost && cost <= SPUR_SHIFT_MAX) {
+                    best_cost = cost; best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
+                  }
+                  break;
+                }
+                s += (dir == 0 ? nudge : -nudge);        // the grid rounded the LO short of the needed move
+              }
+            }
+            if (best_cost == INT32_MAX) {                // nothing within the budget: the budget edge that helps most
+              for (int dir = 0; dir < 2; dir++) {
+                int32_t s = (dir == 0 ? SPUR_SHIFT_MAX : -SPUR_SHIFT_MAX);
+                ADF4351_plan_t p;
+                int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + s, &p) - target_f);
+                int32_t o2 = o_ref - ks * dL;
+                int32_t a2 = (o2 < 0 ? -o2 : o2);
+                if (a2 > best_a) {
+                  best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
+                }
+              }
+            }
+            if (best_a < D && (family == SPUR_A4 || family == SPUR_C3M || family == SPUR_C3P) && lf < local_IF/2 - 10000000) {
+              // the shift budget does not clear the product: below IF, as the spur table did for the lowest spurs
+              if (debug_avoid) stored_t[i] = -70.0;                      // Display when to do spur shift in the stored trace
+              setting.below_IF = S_AUTO_ON;
+              target_f = local_IF - lf;
+              retune = LO_retune(target_f);
+              if (retune)
+                ADF4351_plan_frequency(target_f, &plan);
+            } else if (best_cost != INT32_MAX || best_a > (o < 0 ? -o : o)) {
+              // A planned LO that clears D (or the budget edge that helps most). Program it even when the move is
+              // zero: the product was inside D only because the hysteresis holds the LO off the target.
+              if (debug_avoid) stored_t[i] = -60.0;                      // Display when to do spur shift in the stored trace
+              if (best_s != 0) {
+                local_IF += best_s;
+                LO_spur_shifted = true;
+              }
+              target_f = best_f;
+              plan = best_plan;
+              retune = true;
+            }
+          }
+          if (retune) {                                                  // as set_freq(ADF4351_LO, target_f)
+            real_old_freq[ADF4351_LO] = ADF4351_commit_frequency(&plan);
+            old_freq[ADF4351_LO] = target_f;
+          }
+        } else {
           if ( target_f < real_old_freq[ADF4351_LO] - MAX_COMPENSATION || target_f > real_old_freq[ADF4351_LO] + MAX_COMPENSATION )
             set_freq(ADF4351_LO, target_f);
         }
 
 #if 1                                                               // Compensate frequency ADF4350 error with SI4468
-        if (actual_rbw_x10 < 3000 || setting.frequency_step < 100000) { //TODO always compensate for the moment as this eliminates artifacts at larger RBW
-        int32_t error_f = 0;
-        if (real_old_freq[ADF4351_LO] > target_f) {
-          error_f = real_old_freq[ADF4351_LO] - target_f;
-
-          if (inverted_f) {
-            error_f = -error_f;
-            goto correct_min;
-          }
-        correct_plus:
-         if (LO_harmonic)
-            error_f *= setting.harmonic;
-          if (error_f > actual_rbw_x10 * 5 || LO_harmonic) {        //RBW / 4
-            local_IF += error_f;
-          }
-        } else if ( real_old_freq[ADF4351_LO] < target_f) {
-          error_f = real_old_freq[ADF4351_LO] - target_f;
-          if (inverted_f) {
-            error_f = -error_f;
-            goto correct_plus;
-          }
-        correct_min:
-          if (LO_harmonic) {
-            error_f *= setting.harmonic;
-          }
-          if ( error_f < - actual_rbw_x10 * 5 || LO_harmonic) {    //RBW / 4
-            local_IF += error_f;
-          }
-        }
-        }
+        local_IF += LO_IF_correction(real_old_freq[ADF4351_LO], target_f, inverted_f);
 #endif
       } else if (setting.mode == M_HIGH || direct) {        // direct means PATH_DIRECT or PATH_LEAKAGE
         if (signal_path == PATH_DIRECT) {
@@ -4991,8 +5129,6 @@ again:                                                              // Spur redu
 #ifdef TINYSA4
     if (SI4432_step_delay && (ADF4351_frequency_changed || SI4463_frequency_changed)) {
       int my_step_delay = SI4432_step_delay;
-      if (lf < LOW_SHIFT_FREQ && actual_rbw_x10 == 3 && !in_step_test)
-        my_step_delay = my_step_delay * 2;
 //      if (LO_spur_shifted) // || SI4463_offset_changed)
 //        my_step_delay = my_step_delay * 2;
 #if 0   // Always have some delay before measuring RSSI

@@ -737,7 +737,12 @@ VNA_SHELL_FUNCTION(cmd_if1)
     return;
   } else {
     freq_t a = (freq_t)my_atoui(argv[0]);
-    if (a!= 0 &&( a < (DEFAULT_IF - (freq_t)80000000) || a>(DEFAULT_IF + (freq_t)80000000)))
+    freq_t f = DEFAULT_IF;
+#ifdef TINYSA4
+    if (hw_if)
+      f = DEFAULT_IF_PLUS;                  // the 1070 MHz IF of the hw_if units
+#endif
+    if (a!= 0 &&( a < (f - (freq_t)80000000) || a>(f + (freq_t)80000000)))
       goto usage;
     config.frequency_IF1 = a;
     config_save();
