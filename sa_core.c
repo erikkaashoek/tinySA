@@ -4811,13 +4811,17 @@ again:                                                              // Spur redu
               retune = LO_retune(target_f);
               if (retune)
                 ADF4351_plan_frequency(target_f, &plan);
-            } else if (best_s != 0) {
+            } else if (best_cost != INT32_MAX || best_a > (o < 0 ? -o : o)) {
+              // A planned LO that clears D (or the budget edge that helps most). Program it even when the move is
+              // zero: the product was inside D only because the hysteresis holds the LO off the target.
               if (debug_avoid) stored_t[i] = -60.0;                      // Display when to do spur shift in the stored trace
-              local_IF += best_s;
-              LO_spur_shifted = true;
+              if (best_s != 0) {
+                local_IF += best_s;
+                LO_spur_shifted = true;
+              }
               target_f = best_f;
               plan = best_plan;
-              retune = true;                 // a shifted point programs its planned LO: the hysteresis would keep the old one
+              retune = true;
             }
           }
           if (retune) {                                                  // as set_freq(ADF4351_LO, target_f)
