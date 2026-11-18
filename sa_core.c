@@ -3231,7 +3231,8 @@ freq_t spur_IF = static_spur_IF;
 // k1 * (lf + e - f) - kc * c - ks * shift from the receive frequency; f is its input frequency at the
 // nominal IF, shift an IF shift on top of that, ks = kc - k1.
 #define SI4468_LOW_IF       468750          // Si4468 receiver IF: 30 MHz / 64
-#define SPUR_SHIFT_MAX      450000          // largest IF shift: stays inside the BPF with IF1 0.5 MHz off
+#define SPUR_SHIFT_MAX      900000          // largest IF shift, upward only: the nominal IF sits 0.5 MHz below the
+                                            // filter centre, so a move up stays inside the filter with IF1 0.5 MHz off
 enum { SPUR_A4, SPUR_C3M, SPUR_C3P, SPUR_B2, SPUR_A3, SPUR_B5, SPUR_FAMILIES };   // 266.95, 355.78, 356.10, 533.91, 712.50, 1603.60 MHz
 static uint32_t spur_family_freq[SPUR_FAMILIES];
 static uint32_t spur_family_lo[SPUR_FAMILIES], spur_family_hi[SPUR_FAMILIES];   // inputs that can put a product within D
@@ -3367,9 +3368,10 @@ void fill_spur_table(void)
 //  dynamic_spur_table[dynamic_spur_table_size++] = 153000000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 174600000;
 //  dynamic_spur_table[dynamic_spur_table_size++] = 219000000;
-  if (hw_if) {              // all internal spurs of these units are found from the actual LO setting by
-                            // spur_family_offset(); the table stays empty (the former entries IF/4 - 400 kHz,
-                            // 2IF/3 + 160 kHz and 3IF/2 held no line of their own, bench 2026-11-16/17)
+  {                         // The internal spurs are found from the actual LO setting by spur_family_offset(), so
+                            // the dynamic table stays empty. On the hw_if units the former entries IF/4 - 400 kHz,
+                            // 2IF/3 + 160 kHz and 3IF/2 held no line of their own (bench 2026-11-16/17); on the
+                            // 977.4 MHz units the former entries were the same families (bench 2026-11-18).
     spur_family_freq[SPUR_A4]  = (corr_IF - 4*SI4468_LOW_IF)/4;
     spur_family_freq[SPUR_C3M] = (corr_IF - 5*SI4468_LOW_IF)/3;
     spur_family_freq[SPUR_C3P] = (corr_IF - 3*SI4468_LOW_IF)/3;
@@ -3384,17 +3386,6 @@ void fill_spur_table(void)
       if ((i == SPUR_C3M || i == SPUR_C3P) && actual_rbw_x10 > 1000)  // -98 dBm: below the noise above 100 kHz RBW
         spur_family_hi[i] = 0;
     }
-  } else {
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2;
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/4 -spur_factor/2 + 60000;
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/3 -spur_factor/3;
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 40000;
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor - 20000;
-    if (actual_rbw_x10 < 3000) {
-          dynamic_spur_table[dynamic_spur_table_size++] = corr_IF/2 -spur_factor + 10000;
-    }
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*2/3 -spur_factor*2/3;
-    dynamic_spur_table[dynamic_spur_table_size++] = corr_IF*3/2 -spur_factor*3/2;
   }
   spur_table = dynamic_spur_table;
   spur_table_size = dynamic_spur_table_size;
@@ -4749,7 +4740,8 @@ again:                                                              // Spur redu
         }
         if (signal_path == PATH_LEAKAGE)
           set_freq(ADF4351_LO, target_f);       // Never used as leakage is taken care under direct
-        else if (hw_if && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_B5]             // families sorted by frequency
+        else if ((hw_if || actual_rbw_x10 >= RBW_FOR_STATIC_TABLE)                                   // 977.4 MHz units: static table below
+                 && lf >= spur_family_lo[SPUR_A4] && lf <= spur_family_hi[SPUR_B5]                   // families sorted by frequency
                  && spur_family_window(lf) && setting.mode == M_LOW && (signal_path == PATH_LOW || signal_path == PATH_ULTRA)
                  && !tracking && setting.auto_IF && config.frequency_IF2 == 0
                  && avoid_setting == avoid_auto && !in_selftest && !S_STATE(setting.spur_removal) && setting.below_IF == S_AUTO_OFF
@@ -4768,39 +4760,37 @@ again:                                                              // Spur redu
             int ks = spur_family_ks[family];
             int f2;
             int32_t o_ref = spur_family_offset(lf, target_f, target_f, inverted_f, 0, &f2);
-            int32_t need[2] = { (o_ref + D + ks - 1) / ks, -((D - o_ref + ks - 1) / ks) };    // LO above / below target_f
+            // Only an upward move is safe for any filter offset within +-0.5 MHz (the nominal sits 0.5 MHz below
+            // the filter centre): find the smallest upward LO move that puts the product D below the receive
+            // frequency; the LO moves in grid steps, so nudge when the planned move fell short. A zero move
+            // programs the LO onto the target when the hysteresis error alone put the product inside D.
+            int32_t s = (o_ref + D + ks - 1) / ks;
+            if (s < 0)
+              s = 0;
             int32_t nudge = (D / 8 > 2500 ? D / 8 : 2500);
             ADF4351_plan_t best_plan = {0};
             freq_t best_f = target_f;
             int32_t best_s = 0, best_cost = INT32_MAX, best_a = (o < 0 ? -o : o);
-            for (int dir = 0; dir < 2; dir++) {
-              int32_t s = need[dir];
-              for (int tries = 0; tries < 3; tries++) {
-                if (s > SPUR_SHIFT_MAX || s < -SPUR_SHIFT_MAX)
-                  break;
-                ADF4351_plan_t p;
-                int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + s, &p) - target_f);
-                int32_t o2 = o_ref - ks * dL;
-                int32_t a2 = (o2 < 0 ? -o2 : o2), cost = (dL < 0 ? -dL : dL);
-                if (a2 >= D) {
-                  if (cost < best_cost && cost <= SPUR_SHIFT_MAX) {
-                    best_cost = cost; best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
-                  }
-                  break;
+            for (int tries = 0; tries < 3 && s <= SPUR_SHIFT_MAX; tries++) {
+              ADF4351_plan_t p;
+              int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + s, &p) - target_f);
+              int32_t o2 = o_ref - ks * dL;
+              int32_t a2 = (o2 < 0 ? -o2 : o2);
+              if (a2 >= D) {
+                if (dL >= 0 && dL <= SPUR_SHIFT_MAX) {
+                  best_cost = dL; best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
                 }
-                s += (dir == 0 ? nudge : -nudge);        // the grid rounded the LO short of the needed move
+                break;
               }
+              s += nudge;
             }
-            if (best_cost == INT32_MAX) {                // nothing within the budget: the budget edge that helps most
-              for (int dir = 0; dir < 2; dir++) {
-                int32_t s = (dir == 0 ? SPUR_SHIFT_MAX : -SPUR_SHIFT_MAX);
-                ADF4351_plan_t p;
-                int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + s, &p) - target_f);
-                int32_t o2 = o_ref - ks * dL;
-                int32_t a2 = (o2 < 0 ? -o2 : o2);
-                if (a2 > best_a) {
-                  best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
-                }
+            if (best_cost == INT32_MAX) {                // the budget does not clear the product: its edge, if that helps
+              ADF4351_plan_t p;
+              int32_t dL = (int32_t)(ADF4351_plan_frequency(target_f + SPUR_SHIFT_MAX, &p) - target_f);
+              int32_t o2 = o_ref - ks * dL;
+              int32_t a2 = (o2 < 0 ? -o2 : o2);
+              if (a2 > best_a) {
+                best_s = dL; best_f = target_f + dL; best_plan = p; best_a = a2;
               }
             }
             if (best_a < D && (family == SPUR_A4 || family == SPUR_C3M || family == SPUR_C3P) && lf < local_IF/2 - 10000000) {
