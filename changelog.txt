@@ -1,7 +1,7 @@
-V1.4330 2026-11-17 For all tinySA Ultra models
-- Internal spurs of the tinySA Ultra+ (the models with the 1070 MHz IF filter): the lines caused by harmonics of the LO near 267, 356, 534, 712 and 1604 MHz are avoided per sweep point from the actual LO setting, with an IF shift of at most 450 kHz instead of 0.5 or 1.5 MHz. The affected points read within about 1 dB instead of up to 4 dB low, a unit whose IF filter sits 0.5 MHz below the stored centre is no longer 20-26 dB deaf around 534 MHz at RBW 300 kHz and above, and the 712 MHz and 356 MHz lines that stayed at RBW 10 kHz and below are gone. The 1604 MHz line is removed as well while spur reduction is off (Ultra+ only)
+V1.4333 2026-11-18 For all tinySA Ultra models
+- The frequency ranges around 487 and 651 MHz (tinySA Ultra) and around 534 MHz (tinySA Ultra+) are no longer deaf at RBW 300 kHz and above: they read within about 2 dB instead of 3-8 dB low, and no longer 15-30 dB low on a unit whose IF filter sits 0.5 MHz below the stored centre
+- The 712 MHz and 356 MHz lines that stayed at RBW 10 kHz and below are gone, and the 1604 MHz line is removed while spur reduction is off (Ultra+ only)
 - Fast sweep (SWEEP SETTINGS > FAST) no longer loses the first point after a full retune of the receiver
-- Console: "if1" accepts the 1070 MHz IF of the Ultra+ (it refused every value) (Ultra+ only)
 
 V1.4321 2026-11-12 For all tinySA models
 - Console: "ui off" stops all drawing on the screen while a PC is in control, so commands no longer wait for the screen to be redrawn (e.g. 2 ms instead of about 120 ms after a setting). The screen shows "Remote only mode. Touch screen to enable UI", "ui off "text"" adds a line under it, e.g. to tell the tracking generator from the analyzer when a PC uses two tinySA. A touch or a jog press gives the UI back, as do "ui on", unplugging USB, USB DISK mode and the commands that need the user (selftest, touchcal, touchtest, menu); the console then sends "ui on" before the next text reply. While the UI is off, messages such as errors go to the console. "ui" shows the state. It is not stored in the config or in presets and stays off when the mode changes (Ultra only)
